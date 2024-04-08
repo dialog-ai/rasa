@@ -221,6 +221,11 @@ class OutputChannel:
 
     async def send_response(self, recipient_id: Text, message: Dict[Text, Any]) -> None:
         """Send a message to the client."""
+
+        # FIXME: lonycell begin >>> 2024-04-08
+        logger.debug(f"channel: send_response: hidden !")
+        # FIXME: lonycell end <<< 2024-04-08
+
         if message.get("quick_replies"):
             await self.send_quick_replies(
                 recipient_id,

@@ -108,6 +108,31 @@ target "full" {
   ]
 }
 
+# FIXME: lonycell begin >>> 2024-04-08
+target "dialog-ai" {
+  dockerfile = "docker/Dockerfile.dialog-ai"
+  tags       = ["${IMAGE_NAME}:dialog-ai-${IMAGE_TAG}"]
+
+  args = {
+    IMAGE_BASE_NAME         = "${IMAGE_NAME}"
+    BASE_IMAGE_HASH         = "${BASE_IMAGE_HASH}"
+    BASE_MITIE_IMAGE_HASH   = "${BASE_MITIE_IMAGE_HASH}"
+    BASE_BUILDER_IMAGE_HASH = "${BASE_BUILDER_IMAGE_HASH}"
+  }
+}
+target "botfront" {
+  dockerfile = "docker/Dockerfile.botfront"
+  tags       = ["${IMAGE_NAME}:${IMAGE_TAG}"]
+
+  args = {
+    IMAGE_BASE_NAME         = "${IMAGE_NAME}"
+    BASE_IMAGE_HASH         = "${BASE_IMAGE_HASH}"
+    BASE_MITIE_IMAGE_HASH   = "${BASE_MITIE_IMAGE_HASH}"
+    BASE_BUILDER_IMAGE_HASH = "${BASE_BUILDER_IMAGE_HASH}"
+  }
+}
+# FIXME: lonycell end <<< 2024-04-08
+
 target "mitie-en" {
   dockerfile = "docker/Dockerfile.pretrained_embeddings_mitie_en"
   tags       = ["${IMAGE_NAME}:${IMAGE_TAG}-mitie-en"]

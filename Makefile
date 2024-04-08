@@ -281,6 +281,24 @@ build-docker-spacy-it:
 	docker buildx bake --set default.platform=${PLATFORM} -f docker/docker-bake.hcl base-builder && \
 	docker buildx bake --set default.platform=${PLATFORM} -f docker/docker-bake.hcl spacy-it
 
+# FIXME: lonycell begin >>> 2024-04-08
+build-docker-dialog-ai:
+	export IMAGE_NAME=hmaas/rasa-core && \
+	docker buildx use default && \
+	docker buildx bake --set default.platform=${PLATFORM} -f docker/docker-bake.hcl base && \
+	docker buildx bake --set default.platform=${PLATFORM} -f docker/docker-bake.hcl base-images && \
+	docker buildx bake --set default.platform=${PLATFORM} -f docker/docker-bake.hcl base-builder && \
+	docker buildx bake --set default.platform=${PLATFORM} -f docker/docker-bake.hcl dialog-ai
+
+build-docker-botfront:
+	export IMAGE_NAME=hmaas/rasa-core && \
+	docker buildx use default && \
+	docker buildx bake --set default.platform=${PLATFORM} -f docker/docker-bake.hcl base && \
+	docker buildx bake --set default.platform=${PLATFORM} -f docker/docker-bake.hcl base-poetry && \
+	docker buildx bake --set default.platform=${PLATFORM} -f docker/docker-bake.hcl base-builder && \
+	docker buildx bake --set default.platform=${PLATFORM} -f docker/docker-bake.hcl botfront
+# FIXME: lonycell end <<< 2024-04-08
+
 build-tests-deployment-env: ## Create environment files (.env) for docker-compose.
 	cd tests_deployment && \
 	test -f .env || cat .env.example >> .env

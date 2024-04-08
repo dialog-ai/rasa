@@ -54,6 +54,8 @@ from rasa.shared.constants import (
     DEFAULT_SENDER_ID,
     DEFAULT_MODELS_PATH,
     TEST_STORIES_FILE_PREFIX,
+    DEFAULT_DATA_PATH, ## FIXME: lonycell 2024-04-08
+    DEFAULT_DOMAIN_PATH, ## FIXME: lonycell 2024-04-08
 )
 from rasa.shared.core.domain import InvalidDomain, Domain
 from rasa.core.agent import Agent
@@ -1053,7 +1055,16 @@ def create_app(
             "train your model.",
         )
 
-        training_payload = _training_payload_from_yaml(request, temporary_directory)
+        # FIXME: lonycell begin >>> 2024-04-08
+        #-- training_payload = _training_payload_from_yaml(request, temporary_directory)
+        load_model_after = request.args.get("load_model_after", False)
+        is_yaml_payload = request.headers.get("Content-type") == YAML_CONTENT_TYPE
+        if is_yaml_payload:
+            training_payload = _training_payload_from_yaml(request, temporary_directory)
+        else:
+            training_payload = _training_payload_from_json(request, temporary_directory)
+            load_model_after = request.json.get("load_model_after", load_model_after)
+        # FIXME: lonycell end <<< 2024-04-08
 
         try:
             with app.ctx.active_training_processes.get_lock():
@@ -1066,6 +1077,16 @@ def create_app(
 
             if training_result.model:
                 filename = os.path.basename(training_result.model)
+
+                # FIXME: lonycell begin >>> 2024-04-08
+                if load_model_after is True:
+                    app.ctx.agent = await _load_agent(
+                        training_result.model,
+                        endpoints=endpoints,
+                        model_server = app.ctx.agent.model_server,
+                    )
+                    logger.debug(f"Successfully loaded model '{filename}'.")
+                # FIXME: lonycell end <<< 2024-04-08
 
                 return await response.file(
                     training_result.model,
@@ -1476,6 +1497,107 @@ def _training_payload_from_yaml(
         nlu_additional_arguments=_extract_nlu_additional_arguments(request),
     )
 
+# FIXME: lonycell begin >>> 2024-04-08
+def _training_payload_from_json(
+    request: Request, temp_dir: Path
+) -> Dict[Text, Union[Text, bool]]:
+    logger.debug(
+        "Extracting JSON payload with Markdown training data from request body."
+    )
+
+    # lonycell add config path
+    congfig_dir = os.path.join(Path(''), "config")
+    if not os.path.exists(congfig_dir):
+        os.mkdir(congfig_dir)
+    logger.info("temp_dir: {}, but we save config file to: {}".format(temp_dir, congfig_dir))
+    temp_dir = congfig_dir
+
+    request_payload = request.json
+    _validate_json_training_payload(request_payload)
+
+    # bf >>
+    # config_path = os.path.join(temp_dir, "config.yml")
+    # rasa.shared.utils.io.write_text_file(request_payload["config"], config_path)
+
+    # lonycell: we only take the first config, and save it as config.yml instead of config-en.yml
+    config_path = os.path.join(temp_dir, "config.yml")
+    for key in request_payload["config"].keys():
+        # config_path = os.path.join(temp_dir, "config-{}.yml".format(key))
+        if "language" not in request_payload["config"][key]:
+            request_payload["config"][key]["language"] = key
+            logger.info("no language key in config {}, so add it!".format(request_payload["config"][key]["language"]))
+        rasa.shared.utils.io.write_text_file(
+            request_payload["config"][key], config_path
+        )
+        # config_paths += [config_path]
+        break
+
+    nlu_dir = os.path.join(temp_dir, DEFAULT_DATA_PATH)
+    if not os.path.exists(nlu_dir):
+        os.mkdir(nlu_dir)
+
+    if "nlu" in request_payload:
+        nlu_path = os.path.join(nlu_dir, "nlu.json")
+        for key in request_payload["nlu"].keys():
+            rasa.shared.utils.io.dump_obj_as_json_to_file(nlu_path, request_payload["nlu"][key])
+            break
+
+        # nlu_dir = os.path.join(temp_dir, "nlu")
+        # os.mkdir(nlu_dir)
+
+        # for key in request_payload["nlu"].keys():
+        #     nlu_path = os.path.join(nlu_dir, "{}.json".format(key))
+        #     rasa.shared.utils.io.dump_obj_as_json_to_file(
+        #         nlu_path, request_payload["nlu"][key]
+        #     )
+
+    # story and rules
+    if "fragments" in request_payload:
+        fragments_path = os.path.join(nlu_dir, "fragments.yml")
+        rasa.shared.utils.io.write_text_file(
+            request_payload["fragments"], fragments_path
+        )
+
+    if "augmentation_factor" in request_payload:
+        augmentation_factor = request_payload["augmentation_factor"]
+    else:
+        augmentation_factor = os.environ.get("AUGMENTATION_FACTOR", 50)
+    # << bf
+
+    if "responses" in request_payload:
+        responses_path = os.path.join(temp_dir, "responses.md")
+        rasa.shared.utils.io.write_text_file(
+            request_payload["responses"], responses_path
+        )
+
+    domain_path = DEFAULT_DOMAIN_PATH
+    if "domain" in request_payload:
+        domain_path = os.path.join(temp_dir, "domain.yml")
+        rasa.shared.utils.io.write_text_file(request_payload["domain"], domain_path)
+
+    # model_output_directory = str(temp_dir)
+    # if request_payload.get(
+    #     "save_to_default_model_directory",
+    #     request.args.get("save_to_default_model_directory", True),
+    # ):
+    #     model_output_directory = DEFAULT_MODELS_PATH
+
+    return dict(
+        domain=domain_path,
+        config=config_path,
+        training_files=nlu_dir,
+        output=os.environ.get("MODEL_PATH", DEFAULT_MODELS_PATH),  # bf
+        force_training=request_payload.get(
+            "force", request.args.get("force_training", False)
+        ),
+        fixed_model_name=request_payload.get("fixed_model_name"),  # bf
+        persist_nlu_training_data=True,  # bf
+        core_additional_arguments={
+            "augmentation_factor": int(augmentation_factor),
+        },  # bf
+    )
+# FIXME: lonycell end <<< 2024-04-08
+
 
 def _nlu_training_payload_from_json(
     request: Request, temp_dir: Path, file_name: Text = "data.json"
@@ -1503,6 +1625,42 @@ def _nlu_training_payload_from_json(
         nlu_additional_arguments=_extract_nlu_additional_arguments(request),
     )
 
+# FIXME: lonycell begin >>> 2024-04-08
+def _validate_json_training_payload(rjs: Dict):
+    if "config" not in rjs:
+        raise ErrorResponse(
+            HTTPStatus.BAD_REQUEST,
+            "BadRequest",
+            "The training request is missing the required key `config`.",
+            {"parameter": "config", "in": "body"},
+        )
+
+    if "nlu" not in rjs and "stories" not in rjs:
+        raise ErrorResponse(
+            HTTPStatus.BAD_REQUEST,
+            "BadRequest",
+            "To train a Rasa model you need to specify at least one type of "
+            "training data. Add `nlu` and/or `stories` to the request.",
+            {"parameters": ["nlu", "stories"], "in": "body"},
+        )
+
+    if "stories" in rjs and "domain" not in rjs:
+        raise ErrorResponse(
+            HTTPStatus.BAD_REQUEST,
+            "BadRequest",
+            "To train a Rasa model with story training data, you also need to "
+            "specify the `domain`.",
+            {"parameter": "domain", "in": "body"},
+        )
+
+    if "force" in rjs or "save_to_default_model_directory" in rjs:
+        rasa.shared.utils.io.raise_deprecation_warning(
+            "Specifying 'force' and 'save_to_default_model_directory' as part of the "
+            "JSON payload is deprecated. Please use the header arguments "
+            "'force_training' and 'save_to_default_model_directory'.",
+            docs=_docs("/api/http-api"),
+        )
+# FIXME: lonycell end <<< 2024-04-08
 
 def _validate_yaml_training_payload(yaml_text: Text) -> None:
     try:
@@ -1514,7 +1672,6 @@ def _validate_yaml_training_payload(yaml_text: Text) -> None:
             f"The request body does not contain valid YAML. Error: {e}",
             help_url=DOCS_URL_TRAINING_DATA,
         )
-
 
 def _extract_core_additional_arguments(request: Request) -> Dict[Text, Any]:
     return {
