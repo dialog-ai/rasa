@@ -12,7 +12,7 @@ FROM ${IMAGE_BASE_NAME}:base-builder-${BASE_BUILDER_IMAGE_HASH} as builder
 
 # copy files
 COPY . /build/
-COPY docker/configs/config_pretrained_embeddings_spacy_en_duckling.yml /build/config.yml
+##FIXME COPY docker/configs/config_pretrained_embeddings_spacy_en_duckling.yml /build/config.yml
 
 # change working directory
 WORKDIR /build
@@ -48,6 +48,29 @@ ENV PATH="/opt/venv/bin:$PATH"
 # spacy link
 RUN python -m spacy download en_core_web_md && \
     python -m spacy link en_core_web_md en
+
+FROM builder
+COPY ./rasa_addons /build/rasa_addons
+COPY ./rasa_addons/pyproject.toml /build/
+
+# change working directory
+WORKDIR /build
+
+RUN python -m venv /opt/venv && \
+  . /opt/venv/bin/activate && \
+  pip install --no-cache-dir -U "pip==22.*" -U "wheel>0.38.0" && \
+  pip install wheel setuptools
+
+RUN cd rasa_addons && \
+  mkdir rasa_addons && \
+  mv `\ls -1 . | grep -v -e setup.py -e rasa_addons` ./rasa_addons/ && \
+  python setup.py install && \
+  cd ..
+
+RUN . /opt/venv/bin/activate && \
+  poetry build -f wheel -n && \
+  pip install --no-deps dist/*.whl && \
+  rm -rf dist *.egg-info
 
 # start a new build stage
 FROM ${IMAGE_BASE_NAME}:base-${BASE_IMAGE_HASH} as runner

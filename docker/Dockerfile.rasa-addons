@@ -5,7 +5,8 @@ ARG BASE_MITIE_IMAGE_HASH
 ARG BASE_BUILDER_IMAGE_HASH
 
 FROM ${IMAGE_BASE_NAME}:base-builder-${BASE_BUILDER_IMAGE_HASH} as builder
-COPY ./rasa_addons /build/
+COPY ./rasa_addons /build/rasa_addons
+COPY ./rasa_addons/pyproject.toml /build/
 
 # change working directory
 WORKDIR /build

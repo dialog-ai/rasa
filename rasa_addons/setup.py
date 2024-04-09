@@ -2,9 +2,9 @@ from setuptools import setup, find_packages
 
 setup(
     name="rasa_addons",
-    version="2.3.3",
-    author="Botfront",
-    description="Rasa Addons - Components for Rasa and Botfront",
+    version="0.0.1",
+    author="Dialfront",
+    description="Rasa Addons - Components for Rasa and Dialfront",
     install_requires=[
         "requests_futures",
         "fuzzy_matcher",

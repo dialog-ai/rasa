@@ -6,6 +6,7 @@ from typing import Any, Text, Dict, Optional
 
 import rasa.shared.utils.io
 from rasa.nlu import utils
+from rasa.model_training import train_nlu
 from rasa.nlu.components import Component
 from rasa.nlu.config import RasaNLUModelConfig
 from rasa.shared.nlu.training_data.message import Message
