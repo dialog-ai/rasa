@@ -213,6 +213,7 @@ class Domain:
     def from_yaml(cls, yaml: Text, original_filename: Text = "") -> "Domain":
         """Loads the `Domain` from YAML text after validating it."""
         try:
+            ## FIXME: lonycell - inspection!
             rasa.shared.utils.validation.validate_yaml_schema(yaml, DOMAIN_SCHEMA_FILE)
 
             data = rasa.shared.utils.io.read_yaml(yaml)

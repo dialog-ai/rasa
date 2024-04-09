@@ -170,6 +170,7 @@ def validate_yaml_schema(
     )
 
     try:
+        ## FIXME: lonycell - validation yaml format from admin ui.
         c.validate(raise_exception=True)
     except SchemaError:
         raise YamlValidationException(
