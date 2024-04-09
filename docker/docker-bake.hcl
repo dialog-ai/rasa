@@ -111,7 +111,7 @@ target "full" {
 # FIXME: lonycell begin >>> 2024-04-08
 target "dialog-ai" {
   dockerfile = "docker/Dockerfile.dialog-ai"
-  tags       = ["${IMAGE_NAME}:dialog-ai-${IMAGE_TAG}"]
+  tags       = ["${IMAGE_NAME}:${IMAGE_TAG}-core"]
 
   args = {
     IMAGE_BASE_NAME         = "${IMAGE_NAME}"
@@ -119,10 +119,19 @@ target "dialog-ai" {
     BASE_MITIE_IMAGE_HASH   = "${BASE_MITIE_IMAGE_HASH}"
     BASE_BUILDER_IMAGE_HASH = "${BASE_BUILDER_IMAGE_HASH}"
   }
+
+  cache-to = ["type=inline"]
+
+  cache-from = [
+    "type=registry,ref=${IMAGE_NAME}:base-${BASE_IMAGE_HASH}",
+    "type=registry,ref=${IMAGE_NAME}:base-builder-${BASE_BUILDER_IMAGE_HASH}",
+    "type=registry,ref=${IMAGE_NAME}:${BASE_IMAGE_HASH}-core",
+  ]
 }
-target "botfront" {
-  dockerfile = "docker/Dockerfile.botfront"
-  tags       = ["${IMAGE_NAME}:${IMAGE_TAG}"]
+
+target "rasa-addons" {
+  dockerfile = "docker/Dockerfile.rasa-addons"
+  tags       = ["${IMAGE_NAME}:${IMAGE_TAG}-rasa-addons"]
 
   args = {
     IMAGE_BASE_NAME         = "${IMAGE_NAME}"
@@ -130,6 +139,14 @@ target "botfront" {
     BASE_MITIE_IMAGE_HASH   = "${BASE_MITIE_IMAGE_HASH}"
     BASE_BUILDER_IMAGE_HASH = "${BASE_BUILDER_IMAGE_HASH}"
   }
+
+  cache-to = ["type=inline"]
+
+  cache-from = [
+    "type=registry,ref=${IMAGE_NAME}:base-${BASE_IMAGE_HASH}",
+    "type=registry,ref=${IMAGE_NAME}:base-builder-${BASE_BUILDER_IMAGE_HASH}",
+    "type=registry,ref=${IMAGE_NAME}:latest-rasa-addons",
+  ]
 }
 # FIXME: lonycell end <<< 2024-04-08
 

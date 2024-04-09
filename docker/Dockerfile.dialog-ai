@@ -4,11 +4,11 @@ ARG BASE_IMAGE_HASH
 ARG BASE_MITIE_IMAGE_HASH
 ARG BASE_BUILDER_IMAGE_HASH
 
-FROM ${IMAGE_BASE_NAME}:base-mitie-${BASE_MITIE_IMAGE_HASH} as mitie
+##FIXME  FROM ${IMAGE_BASE_NAME}:base-mitie-${BASE_MITIE_IMAGE_HASH} as mitie
 
 FROM ${IMAGE_BASE_NAME}:base-builder-${BASE_BUILDER_IMAGE_HASH} as builder
 
-COPY --from=mitie /build/data /build/data
+##FIXME COPY --from=mitie /build/data /build/data
 
 # copy files
 COPY . /build/
@@ -22,7 +22,22 @@ RUN python -m venv /opt/venv && \
   . /opt/venv/bin/activate && \
   pip install --no-cache-dir -U "pip==22.*" -U "wheel>0.38.0"
 RUN . /opt/venv/bin/activate && poetry install --extras full --no-dev --no-root --no-interaction
+
 RUN . /opt/venv/bin/activate && make install-mitie && \
+  poetry build -f wheel -n && \
+  pip install --no-deps dist/*.whl && \
+  rm -rf dist *.egg-info
+
+# spacy will be install during poetry install
+#  pip install --no-cache-dir spacy && \
+RUN . /opt/venv/bin/activate && \
+  cd rasa_addons && \
+  mkdir rasa_addons && \
+  mv `\ls -1 . | grep -v -e setup.py -e rasa_addons` ./rasa_addons/ && \
+  python setup.py install && \
+  cd ..
+
+RUN . /opt/venv/bin/activate && \
   poetry build -f wheel -n && \
   pip install --no-deps dist/*.whl && \
   rm -rf dist *.egg-info
@@ -49,15 +64,21 @@ ENV HOME=/app
 # update permissions & change user to not run as root
 WORKDIR /app
 RUN chgrp -R 0 /app && chmod -R g=u /app && chmod o+wr /app
-USER 1001
+#USER 1001
+#USER root
 
 # Create a volume for temporary data
 VOLUME /tmp
+VOLUME /app/models
+VOLUME /app/config
 
 # change shell
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 # the entry point
 EXPOSE 5005
-ENTRYPOINT ["rasa"]
-CMD ["--help"]
+
+CMD rasa run \
+  $([ -n "$MODEL_PATH" ] && echo "-m $MODEL_PATH") \
+  $([ -n "$AUTH_TOKEN" ] && echo "--auth-token $AUTH_TOKEN" ) \
+  --enable-api --cors "*" --debug

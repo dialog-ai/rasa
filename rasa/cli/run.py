@@ -88,11 +88,14 @@ def run(args: argparse.Namespace) -> None:
     )
 
     # FIXME: lonycell begin >>> 2024-04-08
-    logger.info("I'm dialog-ai!")
+    logger.info("dialog-ai> setup credentials with predefined from admin.")
     from rasa.utils.botfront import set_endpoints_credentials_args_from_remote
     set_endpoints_credentials_args_from_remote(args)
     # FIXME: lonycell end <<< 2024-04-08
 
+    # FIXME: lonycell begin >>> 2024-04-08
+    logger.info("dialog-ai> enable api with model path.")
+    # FIXME: lonycell end <<< 2024-04-08
     if args.enable_api:
         if not args.remote_storage:
             args.model = _validate_model_path(args.model, "model", DEFAULT_MODELS_PATH)

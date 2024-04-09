@@ -58,10 +58,15 @@ async def get_config_via_graphql(bf_url, project_id):
             response = endpoint(
                 CONFIG_QUERY, {"projectId": project_id, "environment": environment}
             )
+
+            logger.debug("botfront: load ...")
+
             if response.get("errors"):
+                logger.debug("botfront: load ... error #A")
                 raise urllib.error.URLError(
                     ", ".join([e.get("message") for e in response.get("errors")])
                 )
+
             return endpoint(
                 CONFIG_QUERY, {"projectId": project_id, "environment": environment}
             )["data"]
@@ -96,6 +101,8 @@ async def get_config_via_legacy_route(bf_url, project_id):
 
             data = await load()
             response[endpoint] = await data.json()
+            ## FIXME: lonycell
+            session.close()
     return response
 
 
@@ -107,6 +114,7 @@ def set_endpoints_credentials_args_from_remote(args):
 
     if not project_id or not bf_url:
         return
+    
     here = os.listdir(os.getcwd())
     if "endpoints.yml" in here and not args.endpoints:
         args.endpoints = "endpoints.yml"

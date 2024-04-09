@@ -1,0 +1,27 @@
+# The image tagged with the 'full' suffix
+ARG IMAGE_BASE_NAME
+ARG BASE_IMAGE_HASH
+ARG BASE_MITIE_IMAGE_HASH
+ARG BASE_BUILDER_IMAGE_HASH
+
+FROM ${IMAGE_BASE_NAME}:base-builder-${BASE_BUILDER_IMAGE_HASH} as builder
+COPY ./rasa_addons /build/
+
+# change working directory
+WORKDIR /build
+
+RUN python -m venv /opt/venv && \
+  . /opt/venv/bin/activate && \
+  pip install --no-cache-dir -U "pip==22.*" -U "wheel>0.38.0" && \
+  pip install wheel setuptools
+
+RUN cd rasa_addons && \
+  mkdir rasa_addons && \
+  mv `\ls -1 . | grep -v -e setup.py -e rasa_addons` ./rasa_addons/ && \
+  python setup.py install && \
+  cd ..
+
+RUN . /opt/venv/bin/activate && \
+  poetry build -f wheel -n && \
+  pip install --no-deps dist/*.whl && \
+  rm -rf dist *.egg-info
