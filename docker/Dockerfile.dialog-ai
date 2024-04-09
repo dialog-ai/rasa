@@ -28,49 +28,12 @@ RUN . /opt/venv/bin/activate && make install-mitie && \
   pip install --no-deps dist/*.whl && \
   rm -rf dist *.egg-info
 
-# spacy will be install during poetry install
-#  pip install --no-cache-dir spacy && \
-RUN . /opt/venv/bin/activate && \
-  cd rasa_addons && \
-  mkdir rasa_addons && \
-  mv `\ls -1 . | grep -v -e setup.py -e rasa_addons` ./rasa_addons/ && \
-  python setup.py install && \
-  cd ..
-
-RUN . /opt/venv/bin/activate && \
-  poetry build -f wheel -n && \
-  pip install --no-deps dist/*.whl && \
-  rm -rf dist *.egg-info
-
 # make sure we use the virtualenv
 ENV PATH="/opt/venv/bin:$PATH"
 
 # spacy link
 RUN python -m spacy download en_core_web_md && \
     python -m spacy link en_core_web_md en
-
-FROM builder
-COPY ./rasa_addons /build/rasa_addons
-COPY ./rasa_addons/pyproject.toml /build/
-
-# change working directory
-WORKDIR /build
-
-RUN python -m venv /opt/venv && \
-  . /opt/venv/bin/activate && \
-  pip install --no-cache-dir -U "pip==22.*" -U "wheel>0.38.0" && \
-  pip install wheel setuptools
-
-RUN cd rasa_addons && \
-  mkdir rasa_addons && \
-  mv `\ls -1 . | grep -v -e setup.py -e rasa_addons` ./rasa_addons/ && \
-  python setup.py install && \
-  cd ..
-
-RUN . /opt/venv/bin/activate && \
-  poetry build -f wheel -n && \
-  pip install --no-deps dist/*.whl && \
-  rm -rf dist *.egg-info
 
 # start a new build stage
 FROM ${IMAGE_BASE_NAME}:base-${BASE_IMAGE_HASH} as runner

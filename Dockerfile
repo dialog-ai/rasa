@@ -8,11 +8,9 @@ FROM ${IMAGE_BASE_NAME}:base-builder-${BASE_BUILDER_IMAGE_HASH} as builder
 # COPY . /build/
 
 COPY ./rasa /build/rasa
-COPY ./rasa_addons /build/rasa_addons
 COPY ./Makefile /build/
 COPY ./pyproject.toml /build/
 COPY ./poetry.lock /build/
-
 
 # change working directory
 WORKDIR /build
