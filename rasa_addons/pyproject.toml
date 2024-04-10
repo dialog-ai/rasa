@@ -1,0 +1,15 @@
+[tool.poetry]
+name = "rasa-addons"
+version = "0.0.1"
+description = ""
+authors = ["lonycell <lonycell@gmail.com>"]
+packages = [{include = "rasa_addons"}]
+
+[tool.poetry.dependencies]
+python = ">=3.10,<3.11"
+rasa-sdk = "3.7.1"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

@@ -284,6 +284,7 @@ build-docker-spacy-it:
 # FIXME: lonycell begin >>> 2024-04-08
 ai:
 	export IMAGE_NAME=hmaas/rasa-core && \
+	export IMAGE_VERSION=v3.7.0 && \
 	docker buildx use default && \
 	docker buildx bake --set default.platform=${PLATFORM} -f docker/docker-bake.hcl base && \
 	docker buildx bake --set default.platform=${PLATFORM} -f docker/docker-bake.hcl base-poetry && \

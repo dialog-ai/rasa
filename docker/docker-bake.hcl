@@ -3,19 +3,23 @@ variable "IMAGE_NAME" {
 }
 
 variable "IMAGE_TAG" {
-  default = "localdev"
+  default = "dev"
+}
+
+variable "IMAGE_VERSION" {
+  default = "dev"
 }
 
 variable "BASE_IMAGE_HASH" {
-  default = "localdev"
+  default = "dev"
 }
 
 variable "BASE_MITIE_IMAGE_HASH" {
-  default = "localdev"
+  default = "dev"
 }
 
 variable "BASE_BUILDER_IMAGE_HASH" {
-  default = "localdev"
+  default = "dev"
 }
 
 # keep this in sync with the version in .github/poetry_version.txt
@@ -111,10 +115,11 @@ target "full" {
 # FIXME: lonycell begin >>> 2024-04-08
 target "dialog-ai" {
   dockerfile = "docker/Dockerfile.dialog-ai"
-  tags       = ["${IMAGE_NAME}:${IMAGE_TAG}-core"]
+  tags       = ["${IMAGE_NAME}:${IMAGE_VERSION}"]
 
   args = {
     IMAGE_BASE_NAME         = "${IMAGE_NAME}"
+    IMAGE_VERSION           = "${IMAGE_VERSION}"
     BASE_IMAGE_HASH         = "${BASE_IMAGE_HASH}"
     BASE_MITIE_IMAGE_HASH   = "${BASE_MITIE_IMAGE_HASH}"
     BASE_BUILDER_IMAGE_HASH = "${BASE_BUILDER_IMAGE_HASH}"
@@ -125,7 +130,6 @@ target "dialog-ai" {
   cache-from = [
     "type=registry,ref=${IMAGE_NAME}:base-${BASE_IMAGE_HASH}",
     "type=registry,ref=${IMAGE_NAME}:base-builder-${BASE_BUILDER_IMAGE_HASH}",
-    "type=registry,ref=${IMAGE_NAME}:${BASE_IMAGE_HASH}-core",
   ]
 }
 
