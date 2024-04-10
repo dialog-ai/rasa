@@ -91,8 +91,8 @@ class SklearnIntentClassifier(GraphComponent, IntentClassifier):
         """Creates a new untrained component (see parent class for full docstring)."""
         return cls(config, model_storage, resource)
 
-    @staticmethod
-    def required_packages() -> List[Text]:
+    @classmethod
+    def required_packages(cls) -> List[Text]:
         """Any extra python dependencies required for this component to run."""
         return ["sklearn"]
 
@@ -106,8 +106,8 @@ class SklearnIntentClassifier(GraphComponent, IntentClassifier):
     def transform_labels_num2str(self, y: np.ndarray) -> np.ndarray:
         """Transforms a list of strings into numeric label representation.
 
-        :param y: List of labels to convert to numeric representation
-        """
+        :param y: List of labels to convert to numeric representation"""
+
         return self.le.inverse_transform(y)
 
     def train(self, training_data: TrainingData) -> Resource:
@@ -163,7 +163,10 @@ class SklearnIntentClassifier(GraphComponent, IntentClassifier):
 
     def _num_cv_splits(self, y: np.ndarray) -> int:
         folds = self.component_config["max_cross_validation_folds"]
-        return max(2, min(folds, np.min(np.bincount(y)) // 5))
+        # [numpy-upgrade] type ignore can be removed after upgrading to numpy 1.23
+        return max(
+            2, min(folds, np.min(np.bincount(y)) // 5)  # type: ignore[no-untyped-call]
+        )
 
     def _create_classifier(
         self, num_threads: int, y: np.ndarray
@@ -261,7 +264,10 @@ class SklearnIntentClassifier(GraphComponent, IntentClassifier):
         # sort the probabilities retrieving the indices of
         # the elements in sorted order
 
-        sorted_indices = np.fliplr(np.argsort(pred_result, axis=1))
+        # [numpy-upgrade] type ignore can be removed after upgrading to numpy 1.23
+        sorted_indices = np.fliplr(  # type: ignore[no-untyped-call]
+            np.argsort(pred_result, axis=1)
+        )
         return sorted_indices, pred_result[:, sorted_indices]
 
     def persist(self) -> None:

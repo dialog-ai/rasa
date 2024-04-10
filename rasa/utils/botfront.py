@@ -58,15 +58,10 @@ async def get_config_via_graphql(bf_url, project_id):
             response = endpoint(
                 CONFIG_QUERY, {"projectId": project_id, "environment": environment}
             )
-
-            logger.debug("botfront: load ...")
-
             if response.get("errors"):
-                logger.debug("botfront: load ... error #A")
                 raise urllib.error.URLError(
                     ", ".join([e.get("message") for e in response.get("errors")])
                 )
-
             return endpoint(
                 CONFIG_QUERY, {"projectId": project_id, "environment": environment}
             )["data"]
@@ -101,8 +96,6 @@ async def get_config_via_legacy_route(bf_url, project_id):
 
             data = await load()
             response[endpoint] = await data.json()
-            ## FIXME: lonycell
-            session.close()
     return response
 
 
@@ -110,18 +103,17 @@ def set_endpoints_credentials_args_from_remote(args):
     bf_url = os.environ.get("BF_URL")
     project_id = os.environ.get("BF_PROJECT_ID")
 
-    logger.info(f"lonycell: BF_URL={bf_url}, BF_PROJECT_ID={project_id}")
+    logger.info(f"DJYPanda: BF_URL={bf_url}, BF_PROJECT_ID={project_id}")
 
     if not project_id or not bf_url:
         return
-    
     here = os.listdir(os.getcwd())
     if "endpoints.yml" in here and not args.endpoints:
         args.endpoints = "endpoints.yml"
     if "credentials.yml" in here and not args.credentials:
         args.credentials = "credentials.yml"
     if args.endpoints and args.credentials:
-        logger.info(f"lonycell: use local endpoints.yml and credentials.yml")
+        logger.info(f"DJYPanda: use local endpoints.yml and credentials.yml")
         return
 
     query_function = (
@@ -132,7 +124,7 @@ def set_endpoints_credentials_args_from_remote(args):
         query_function(bf_url, project_id)
     )
 
-    logger.info(f"lonycell: {config}")
+    logger.info(f"DJYPanda: {config}")
 
     if not args.endpoints:
         with tempfile.NamedTemporaryFile(mode="w", delete=False) as yamlfile:

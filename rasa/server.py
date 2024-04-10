@@ -3,6 +3,7 @@ import concurrent.futures
 import logging
 import multiprocessing
 import os
+import tempfile
 import traceback
 from collections import defaultdict
 from functools import reduce, wraps
@@ -49,13 +50,13 @@ from rasa.shared.nlu.training_data.formats import RasaYAMLReader
 from rasa.core.constants import DEFAULT_RESPONSE_TIMEOUT
 from rasa.constants import MINIMUM_COMPATIBLE_VERSION
 from rasa.shared.constants import (
+    DEFAULT_DATA_PATH,
     DOCS_URL_TRAINING_DATA,
     DOCS_BASE_URL,
     DEFAULT_SENDER_ID,
     DEFAULT_MODELS_PATH,
     TEST_STORIES_FILE_PREFIX,
-    DEFAULT_DATA_PATH, ## FIXME: lonycell 2024-04-08
-    DEFAULT_DOMAIN_PATH, ## FIXME: lonycell 2024-04-08
+    DEFAULT_DOMAIN_PATH,
 )
 from rasa.shared.core.domain import InvalidDomain, Domain
 from rasa.core.agent import Agent
@@ -67,7 +68,6 @@ from rasa.core.channels.channel import (
 import rasa.shared.core.events
 from rasa.shared.core.events import Event
 from rasa.core.test import test
-from rasa.utils.common import TempDirectoryPath, get_temp_dir_name
 from rasa.shared.core.trackers import (
     DialogueStateTracker,
     EventVerbosity,
@@ -80,7 +80,7 @@ from rasa.shared.utils.schemas.events import EVENTS_SCHEMA
 from rasa.utils.endpoints import EndpointConfig
 
 if TYPE_CHECKING:
-    from ssl import SSLContext
+    from ssl import SSLContext  # noqa: F401
     from rasa.core.processor import MessageProcessor
     from mypy_extensions import Arg, VarArg, KwArg
 
@@ -88,7 +88,7 @@ if TYPE_CHECKING:
         response.HTTPResponse, Coroutine[Any, Any, response.HTTPResponse]
     ]
     SanicView = Callable[
-        [Arg(Request, "request"), VarArg(), KwArg()],
+        [Arg(Request, "request"), VarArg(), KwArg()],  # noqa: F821
         Coroutine[Any, Any, SanicResponse],
     ]
 
@@ -429,6 +429,7 @@ def create_ssl_context(
         SSL context if a valid certificate chain can be loaded, `None` otherwise.
 
     """
+
     if ssl_certificate:
         import ssl
 
@@ -508,6 +509,7 @@ def configure_cors(
     app: Sanic, cors_origins: Union[Text, List[Text], None] = ""
 ) -> None:
     """Configure CORS origins for the given app."""
+
     # Workaround so that socketio works with requests from other origins.
     # https://github.com/miguelgrinberg/python-socketio/issues/205#issuecomment-493769183
     app.config.CORS_AUTOMATIC_OPTIONS = True
@@ -632,7 +634,7 @@ def inject_temp_dir(f: Callable[..., Coroutine]) -> Callable:
 
     @wraps(f)
     async def decorated_function(*args: Any, **kwargs: Any) -> HTTPResponse:
-        with TempDirectoryPath(get_temp_dir_name()) as directory:
+        with tempfile.TemporaryDirectory() as directory:
             # Decorated request handles need to have a parameter `temporary_directory`
             return await f(*args, temporary_directory=Path(directory), **kwargs)
 
@@ -645,7 +647,6 @@ def create_app(
     auth_token: Optional[Text] = None,
     response_timeout: int = DEFAULT_RESPONSE_TIMEOUT,
     jwt_secret: Optional[Text] = None,
-    jwt_private_key: Optional[Text] = None,
     jwt_method: Text = "HS256",
     endpoints: Optional[AvailableEndpoints] = None,
 ) -> Sanic:
@@ -654,7 +655,7 @@ def create_app(
     app.config.RESPONSE_TIMEOUT = response_timeout
     configure_cors(app, cors_origins)
 
-    # Set up the Sanic-JWT extension
+    # Setup the Sanic-JWT extension
     if jwt_secret and jwt_method:
         # `sanic-jwt` depends on having an available event loop when making the call to
         # `Initialize`. If there is none, the server startup will fail with
@@ -672,7 +673,6 @@ def create_app(
         Initialize(
             app,
             secret=jwt_secret,
-            private_key=jwt_private_key,
             authenticate=authenticate,
             algorithm=jwt_method,
             user_id="username",
@@ -694,6 +694,7 @@ def create_app(
     @app.get("/version")
     async def version(request: Request) -> HTTPResponse:
         """Respond with the version number of the installed Rasa."""
+
         return response.json(
             {
                 "version": rasa.__version__,
@@ -722,9 +723,8 @@ def create_app(
         verbosity = event_verbosity_parameter(request, EventVerbosity.AFTER_RESTART)
         until_time = rasa.utils.endpoints.float_arg(request, "until")
 
-        tracker = await app.ctx.agent.processor.fetch_full_tracker_with_initial_session(
-            conversation_id,
-            output_channel=CollectingOutputChannel(),
+        tracker = await app.ctx.agent.processor.fetch_tracker_with_initial_session(
+            conversation_id
         )
 
         try:
@@ -1055,8 +1055,7 @@ def create_app(
             "train your model.",
         )
 
-        # FIXME: lonycell begin >>> 2024-04-08
-        #-- training_payload = _training_payload_from_yaml(request, temporary_directory)
+        # djypanda begin >>>
         load_model_after = request.args.get("load_model_after", False)
         is_yaml_payload = request.headers.get("Content-type") == YAML_CONTENT_TYPE
         if is_yaml_payload:
@@ -1064,7 +1063,7 @@ def create_app(
         else:
             training_payload = _training_payload_from_json(request, temporary_directory)
             load_model_after = request.json.get("load_model_after", load_model_after)
-        # FIXME: lonycell end <<< 2024-04-08
+        # djypanda end <<<
 
         try:
             with app.ctx.active_training_processes.get_lock():
@@ -1078,7 +1077,7 @@ def create_app(
             if training_result.model:
                 filename = os.path.basename(training_result.model)
 
-                # FIXME: lonycell begin >>> 2024-04-08
+                # djypanda begin >>>
                 if load_model_after is True:
                     app.ctx.agent = await _load_agent(
                         training_result.model,
@@ -1086,7 +1085,7 @@ def create_app(
                         model_server = app.ctx.agent.model_server,
                     )
                     logger.debug(f"Successfully loaded model '{filename}'.")
-                # FIXME: lonycell end <<< 2024-04-08
+                    # djypanda end <<<
 
                 return await response.file(
                     training_result.model,
@@ -1497,7 +1496,8 @@ def _training_payload_from_yaml(
         nlu_additional_arguments=_extract_nlu_additional_arguments(request),
     )
 
-# FIXME: lonycell begin >>> 2024-04-08
+
+# djypanda begin >>
 def _training_payload_from_json(
     request: Request, temp_dir: Path
 ) -> Dict[Text, Union[Text, bool]]:
@@ -1505,7 +1505,7 @@ def _training_payload_from_json(
         "Extracting JSON payload with Markdown training data from request body."
     )
 
-    # lonycell add config path
+    # djypanda add config path
     congfig_dir = os.path.join(Path(''), "config")
     if not os.path.exists(congfig_dir):
         os.mkdir(congfig_dir)
@@ -1519,7 +1519,7 @@ def _training_payload_from_json(
     # config_path = os.path.join(temp_dir, "config.yml")
     # rasa.shared.utils.io.write_text_file(request_payload["config"], config_path)
 
-    # lonycell: we only take the first config, and save it as config.yml instead of config-en.yml
+    # djypanda: we only take the first config, and save it as config.yml instead of config-en.yml
     config_path = os.path.join(temp_dir, "config.yml")
     for key in request_payload["config"].keys():
         # config_path = os.path.join(temp_dir, "config-{}.yml".format(key))
@@ -1535,8 +1535,8 @@ def _training_payload_from_json(
     nlu_dir = os.path.join(temp_dir, DEFAULT_DATA_PATH)
     if not os.path.exists(nlu_dir):
         os.mkdir(nlu_dir)
-
     if "nlu" in request_payload:
+
         nlu_path = os.path.join(nlu_dir, "nlu.json")
         for key in request_payload["nlu"].keys():
             rasa.shared.utils.io.dump_obj_as_json_to_file(nlu_path, request_payload["nlu"][key])
@@ -1596,7 +1596,7 @@ def _training_payload_from_json(
             "augmentation_factor": int(augmentation_factor),
         },  # bf
     )
-# FIXME: lonycell end <<< 2024-04-08
+# djypanda end <<
 
 
 def _nlu_training_payload_from_json(
@@ -1625,7 +1625,7 @@ def _nlu_training_payload_from_json(
         nlu_additional_arguments=_extract_nlu_additional_arguments(request),
     )
 
-# FIXME: lonycell begin >>> 2024-04-08
+# djypanda begin >>
 def _validate_json_training_payload(rjs: Dict):
     if "config" not in rjs:
         raise ErrorResponse(
@@ -1660,7 +1660,8 @@ def _validate_json_training_payload(rjs: Dict):
             "'force_training' and 'save_to_default_model_directory'.",
             docs=_docs("/api/http-api"),
         )
-# FIXME: lonycell end <<< 2024-04-08
+# djypanda end <<
+
 
 def _validate_yaml_training_payload(yaml_text: Text) -> None:
     try:
@@ -1672,6 +1673,7 @@ def _validate_yaml_training_payload(yaml_text: Text) -> None:
             f"The request body does not contain valid YAML. Error: {e}",
             help_url=DOCS_URL_TRAINING_DATA,
         )
+
 
 def _extract_core_additional_arguments(request: Request) -> Dict[Text, Any]:
     return {

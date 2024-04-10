@@ -23,7 +23,6 @@ RUN apt-get update -qq && \
   libpng-dev
 
 # install poetry
-#RUN curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/master/get-poetry.py | python - --uninstall
 RUN curl -sSL https://install.python-poetry.org | python3 -
 ENV PATH="${PATH}:/root/.local/bin"
 
@@ -36,8 +35,6 @@ WORKDIR /build
 # install dependencies
 RUN python -m venv /opt/venv && \
   . /opt/venv/bin/activate && \
-  # pip config set global.index-url https://mirrors.aliyun.com/pypi/simple/ && \
-  # pip config set install.trusted-host mirrors.aliyun.com && \
   pip install --no-cache-dir -U 'pip<20' && \
   pip install wheel setuptools && \
   poetry install --only main --no-root --no-interaction
@@ -45,9 +42,6 @@ RUN python -m venv /opt/venv && \
 # spacy will be install during poetry install
 #  pip install --no-cache-dir spacy && \
 RUN . /opt/venv/bin/activate && \
-  # pip config set global.index-url https://mirrors.aliyun.com/pypi/simple/ && \
-  # pip config set install.trusted-host mirrors.aliyun.com && \
-  # pip install ./zh_core_web_md-3.4.0-py3-none-any.whl && \
   cd rasa_addons && \
   mkdir rasa_addons && \
   mv `\ls -1 . | grep -v -e setup.py -e rasa_addons` ./rasa_addons/ && \

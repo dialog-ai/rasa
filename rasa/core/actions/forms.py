@@ -1,8 +1,6 @@
-import copy
 from typing import Text, List, Optional, Union, Any, Dict, Set
 import itertools
 import logging
-import structlog
 import json
 
 from rasa.core.actions import action
@@ -33,7 +31,6 @@ from rasa.shared.core.trackers import DialogueStateTracker
 from rasa.utils.endpoints import EndpointConfig
 
 logger = logging.getLogger(__name__)
-structlogger = structlog.get_logger()
 
 
 class FormAction(LoopAction):
@@ -257,9 +254,7 @@ class FormAction(LoopAction):
             Otherwise, returns empty list since the extracted slots already have
             corresponding `SlotSet` events in the tracker.
         """
-        structlogger.debug(
-            "forms.slots.validate", slot_candidates=copy.deepcopy(slot_candidates)
-        )
+        logger.debug(f"Validating extracted slots: {slot_candidates}")
         events: List[Union[SlotSet, Event]] = [
             SlotSet(slot_name, value) for slot_name, value in slot_candidates.items()
         ]
@@ -543,10 +538,7 @@ class FormAction(LoopAction):
         )
 
         if needs_validation:
-            structlogger.debug(
-                "forms.validation.required",
-                tracker_latest_message=copy.deepcopy(tracker.latest_message),
-            )
+            logger.debug(f"Validating user input '{tracker.latest_message}'.")
             return await self.validate(tracker, domain, output_channel, nlg)
         else:
             # Needed to determine which slots to request although there are no slots
@@ -613,24 +605,9 @@ class FormAction(LoopAction):
 
         if not prefilled_slots:
             logger.debug("No pre-filled required slots to validate.")
-        else:
-            structlogger.debug(
-                "forms.validate.prefilled_slots",
-                prefilled_slots=copy.deepcopy(prefilled_slots),
-            )
+            return []
 
-        validate_name = f"validate_{self.name()}"
-
-        if validate_name not in domain.action_names_or_texts:
-            logger.debug(
-                f"There is no validation action '{validate_name}' "
-                f"to execute at form activation."
-            )
-            return [event for event in extraction_events if isinstance(event, SlotSet)]
-
-        logger.debug(
-            f"Executing validation action '{validate_name}' at form activation."
-        )
+        logger.debug(f"Validating pre-filled required slots: {prefilled_slots}")
 
         validated_events = await self.validate_slots(
             prefilled_slots, tracker, domain, output_channel, nlg
@@ -655,24 +632,7 @@ class FormAction(LoopAction):
         events_so_far: List[Event],
     ) -> List[Event]:
         """Executes form loop after activation."""
-        events: List[Event] = []
-        """
-        Call to validation is not required when the slots are already validated
-        at the time of form activation.
-        events_so_far:
-            - empty when slots have not been validated.
-            - has SlotSet objects when already validated.
-            - ActiveLoop object when events have not been validated.
-        Hence the events are filtered to remove ActiveLoop object that was added
-        at the time of form activation.
-        """
-        filtered_events = [
-            event for event in events_so_far if not isinstance(event, ActiveLoop)
-        ]
-        if not filtered_events:
-            events = await self._validate_if_required(
-                tracker, domain, output_channel, nlg
-            )
+        events = await self._validate_if_required(tracker, domain, output_channel, nlg)
 
         if not self._user_rejected_manually(events):
             events += await self.request_next_slot(

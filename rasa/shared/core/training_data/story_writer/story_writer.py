@@ -27,7 +27,6 @@ class StoryWriter:
                            the existing story file.
             is_test_story: Identifies if the stories should be exported in test stories
                            format.
-
         Returns:
             String with story steps in the desired format.
         """

@@ -1,9 +1,7 @@
 import asyncio
-import copy
 import inspect
 import json
 import logging
-import structlog
 from asyncio import Queue, CancelledError
 from sanic import Blueprint, response
 from sanic.request import Request
@@ -19,7 +17,6 @@ from rasa.core.channels.channel import (
 
 
 logger = logging.getLogger(__name__)
-structlogger = structlog.get_logger()
 
 
 class RestInput(InputChannel):
@@ -27,8 +24,7 @@ class RestInput(InputChannel):
 
     This implementation is the basis for a custom implementation of a chat
     frontend. You can customize this to send messages to Rasa and
-    retrieve responses from the assistant.
-    """
+    retrieve responses from the assistant."""
 
     @classmethod
     def name(cls) -> Text:
@@ -166,28 +162,26 @@ class RestInput(InputChannel):
                             sender_id,
                             input_channel=input_channel,
                             metadata=metadata,
-                            headers=request.headers,
                         )
                     )
                 except CancelledError:
-                    structlogger.error(
-                        "rest.message.received.timeout", text=copy.deepcopy(text)
+                    logger.error(
+                        f"Message handling timed out for " f"user message '{text}'."
                     )
                 except Exception:
-                    structlogger.exception(
-                        "rest.message.received.failure", text=copy.deepcopy(text)
+                    logger.exception(
+                        f"An exception occured while handling "
+                        f"user message '{text}'."
                     )
-
                 return response.json(collector.messages)
 
         return custom_webhook
 
 
 class QueueOutputChannel(CollectingOutputChannel):
-    """Output channel that collects send messages in a list.
+    """Output channel that collects send messages in a list
 
-    (doesn't send them anywhere, just collects them).
-    """
+    (doesn't send them anywhere, just collects them)."""
 
     # FIXME: this is breaking Liskov substitution principle
     # and would require some user-facing refactoring to address

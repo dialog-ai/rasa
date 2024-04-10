@@ -1,10 +1,8 @@
-import inspect
-import copy
 import logging
-import structlog
 import os
 from pathlib import Path
 import tarfile
+import tempfile
 import time
 from types import LambdaType
 from typing import Any, Dict, List, Optional, Text, Tuple, Union
@@ -16,7 +14,6 @@ from rasa.engine.runner.dask import DaskGraphRunner
 from rasa.engine.storage.local_model_storage import LocalModelStorage
 from rasa.engine.storage.storage import ModelMetadata
 from rasa.model import get_latest_model
-from rasa.plugin import plugin_manager
 from rasa.shared.data import TrainingType
 import rasa.shared.utils.io
 import rasa.core.actions.action
@@ -50,7 +47,6 @@ from rasa.shared.core.events import (
     ActionExecuted,
 )
 from rasa.shared.constants import (
-    ASSISTANT_ID_KEY,
     DOCS_URL_DOMAINS,
     DEFAULT_SENDER_ID,
     DOCS_URL_POLICIES,
@@ -58,14 +54,10 @@ from rasa.shared.constants import (
 )
 from rasa.core.nlg import NaturalLanguageGenerator
 from rasa.core.lock_store import LockStore
-from rasa.utils.common import TempDirectoryPath, get_temp_dir_name
 import rasa.core.tracker_store
 import rasa.core.actions.action
 import rasa.shared.core.trackers
 from rasa.shared.core.trackers import DialogueStateTracker, EventVerbosity
-from rasa.shared.core.training_data.story_reader.yaml_story_reader import (
-    YAMLStoryReader,
-)
 from rasa.shared.nlu.constants import (
     ENTITIES,
     INTENT,
@@ -73,11 +65,9 @@ from rasa.shared.nlu.constants import (
     PREDICTED_CONFIDENCE_KEY,
     TEXT,
 )
-from rasa.shared.nlu.training_data.message import Message
 from rasa.utils.endpoints import EndpointConfig
 
 logger = logging.getLogger(__name__)
-structlogger = structlog.get_logger()
 
 MAX_NUMBER_OF_PREDICTIONS = int(os.environ.get("MAX_NUMBER_OF_PREDICTIONS", "10"))
 
@@ -106,17 +96,6 @@ class MessageProcessor:
         self.model_filename, self.model_metadata, self.graph_runner = self._load_model(
             model_path
         )
-
-        if self.model_metadata.assistant_id is None:
-            rasa.shared.utils.io.raise_warning(
-                f"The model metadata does not contain a value for the "
-                f"'{ASSISTANT_ID_KEY}' attribute. Check that 'config.yml' "
-                f"file contains a value for the '{ASSISTANT_ID_KEY}' key "
-                f"and re-train the model. Failure to do so will result in "
-                f"streaming events without a unique assistant identifier.",
-                UserWarning,
-            )
-
         self.model_path = Path(model_path)
         self.domain = self.model_metadata.domain
         self.http_interpreter = http_interpreter
@@ -138,7 +117,7 @@ class MessageProcessor:
             raise ModelNotFound(f"Model {model_path} can not be loaded.")
 
         logger.info(f"Loading model {model_tar}...")
-        with TempDirectoryPath(get_temp_dir_name()) as temporary_directory:
+        with tempfile.TemporaryDirectory() as temporary_directory:
             try:
                 metadata, runner = loader.load_predict_graph_runner(
                     Path(temporary_directory),
@@ -168,8 +147,6 @@ class MessageProcessor:
         tracker = await self.run_action_extract_slots(message.output_channel, tracker)
 
         await self._run_prediction_loop(message.output_channel, tracker)
-
-        await self.run_anonymization_pipeline(tracker)
 
         await self.save_tracker(tracker)
 
@@ -201,34 +178,13 @@ class MessageProcessor:
 
         tracker.update_with_events(extraction_events, self.domain)
 
-        structlogger.debug(
-            "processor.extract.slots",
-            action_extract_slot=ACTION_EXTRACT_SLOTS,
-            len_extraction_events=len(extraction_events),
-            rasa_events=copy.deepcopy(extraction_events),
+        events_as_str = "\n".join([str(e) for e in extraction_events])
+        logger.debug(
+            f"Default action '{ACTION_EXTRACT_SLOTS}' was executed, "
+            f"resulting in {len(extraction_events)} events: {events_as_str}"
         )
 
         return tracker
-
-    async def run_anonymization_pipeline(self, tracker: DialogueStateTracker) -> None:
-        """Run the anonymization pipeline on the new tracker events.
-
-        Args:
-            tracker: A tracker representing a conversation state.
-        """
-        anonymization_pipeline = plugin_manager().hook.get_anonymization_pipeline()
-        if anonymization_pipeline is None:
-            return None
-
-        old_tracker = await self.tracker_store.retrieve(tracker.sender_id)
-        new_events = rasa.shared.core.trackers.TrackerEventDiffEngine.event_difference(
-            old_tracker, tracker
-        )
-
-        for event in new_events:
-            body = {"sender_id": tracker.sender_id}
-            body.update(event.as_dict())
-            anonymization_pipeline.run(body)
 
     async def predict_next_for_sender_id(
         self, sender_id: Text
@@ -393,41 +349,6 @@ class MessageProcessor:
             conversation_id, append_action_listen=False
         )
         tracker.model_id = self.model_metadata.model_id
-        if tracker.assistant_id is None:
-            tracker.assistant_id = self.model_metadata.assistant_id
-        return tracker
-
-    async def fetch_full_tracker_with_initial_session(
-        self,
-        conversation_id: Text,
-        output_channel: Optional[OutputChannel] = None,
-        metadata: Optional[Dict] = None,
-    ) -> DialogueStateTracker:
-        """Get the full tracker for a conversation, including events after a restart.
-
-        Args:
-            conversation_id: The ID of the conversation for which the history should be
-                retrieved.
-            output_channel: Output channel associated with the incoming user message.
-            metadata: Data sent from client associated with the incoming user message.
-
-        Returns:
-            Tracker for the conversation. Creates an empty tracker with a new session
-            initialized in case it's a new conversation.
-        """
-        conversation_id = conversation_id or DEFAULT_SENDER_ID
-
-        tracker = await self.tracker_store.get_or_create_full_tracker(
-            conversation_id, False
-        )
-        tracker.model_id = self.model_metadata.model_id
-
-        if tracker.assistant_id is None:
-            tracker.assistant_id = self.model_metadata.assistant_id
-
-        if not tracker.events:
-            await self._update_tracker_session(tracker, output_channel, metadata)
-
         return tracker
 
     async def get_trackers_for_all_conversation_sessions(
@@ -468,7 +389,12 @@ class MessageProcessor:
 
         if should_save_tracker:
             await self.save_tracker(tracker)
-
+        # botfront >
+        if message.output_channel.name() == 'bot_regression_test_output':
+            # BOTFRONT TEST CHANNEL: send user messages to the output channel
+            # if the output channel is the botfront output channel
+            message.output_channel.send_parsed_message(tracker.latest_message)
+        # < botfront
         return tracker
 
     async def execute_action(
@@ -552,6 +478,7 @@ class MessageProcessor:
         tracker: DialogueStateTracker, reminder_event: ReminderScheduled
     ) -> bool:
         """Check if the conversation has been restarted after reminder."""
+
         for e in reversed(tracker.applied_events()):
             if MessageProcessor._is_reminder(e, reminder_event.name):
                 return True
@@ -562,6 +489,7 @@ class MessageProcessor:
         tracker: DialogueStateTracker, reminder_event: ReminderScheduled
     ) -> bool:
         """Check if the user sent a message after the reminder."""
+
         for e in reversed(tracker.events):
             if MessageProcessor._is_reminder(e, reminder_event.name):
                 return False
@@ -655,9 +583,7 @@ class MessageProcessor:
             [f"\t{s.name}: {s.value}" for s in tracker.slots.values()]
         )
         if slot_values.strip():
-            structlogger.debug(
-                "processor.slots.log", slot_values=copy.deepcopy(slot_values)
-            )
+            logger.debug(f"Current slot values: \n{slot_values}")
 
     def _check_for_unseen_features(self, parse_data: Dict[Text, Any]) -> None:
         """Warns the user if the NLU parse data contains unrecognized features.
@@ -701,16 +627,12 @@ class MessageProcessor:
         )
 
     async def parse_message(
-        self,
-        message: UserMessage,
-        tracker: Optional[DialogueStateTracker] = None,
-        only_output_properties: bool = True,
+        self, message: UserMessage, only_output_properties: bool = True
     ) -> Dict[Text, Any]:
         """Interprets the passed message.
 
         Args:
             message: Message to handle.
-            tracker: Tracker to use.
             only_output_properties: If `True`, restrict the output to
                 Message.only_output_properties.
 
@@ -720,29 +642,13 @@ class MessageProcessor:
         if self.http_interpreter:
             parse_data = await self.http_interpreter.parse(message)
         else:
-            msg = YAMLStoryReader.unpack_regex_message(
-                message=Message({TEXT: message.text})
-            )
-            # Intent is not explicitly present. Pass message to graph.
-            if msg.data.get(INTENT) is None:
-                parse_data = self._parse_message_with_graph(
-                    message, tracker, only_output_properties
-                )
-            else:
-                parse_data = {
-                    TEXT: "",
-                    INTENT: {INTENT_NAME_KEY: None, PREDICTED_CONFIDENCE_KEY: 0.0},
-                    ENTITIES: [],
-                }
-                parse_data.update(
-                    msg.as_dict(only_output_properties=only_output_properties)
-                )
+            parse_data = self._parse_message_with_graph(message, only_output_properties)
 
-        structlogger.debug(
-            "processor.message.parse",
-            parse_data_text=copy.deepcopy(parse_data["text"]),
-            parse_data_intent=parse_data["intent"],
-            parse_data_entities=copy.deepcopy(parse_data["entities"]),
+        logger.debug(
+            "Received user message '{}' with intent '{}' "
+            "and entities '{}'".format(
+                parse_data["text"], parse_data["intent"], parse_data["entities"]
+            )
         )
 
         self._check_for_unseen_features(parse_data)
@@ -750,24 +656,18 @@ class MessageProcessor:
         return parse_data
 
     def _parse_message_with_graph(
-        self,
-        message: UserMessage,
-        tracker: Optional[DialogueStateTracker] = None,
-        only_output_properties: bool = True,
+        self, message: UserMessage, only_output_properties: bool = True
     ) -> Dict[Text, Any]:
         """Interprets the passed message.
 
         Arguments:
             message: Message to handle
-            tracker: Tracker to use
-            only_output_properties: If `True`, restrict the output to
-                Message.only_output_properties.
 
         Returns:
             Parsed data extracted from the message.
         """
         results = self.graph_runner.run(
-            inputs={PLACEHOLDER_MESSAGE: [message], PLACEHOLDER_TRACKER: tracker},
+            inputs={PLACEHOLDER_MESSAGE: [message]},
             targets=[self.model_metadata.nlu_target],
         )
         parsed_messages = results[self.model_metadata.nlu_target]
@@ -789,7 +689,7 @@ class MessageProcessor:
         if message.parse_data:
             parse_data = message.parse_data
         else:
-            parse_data = await self.parse_message(message, tracker)
+            parse_data = await self.parse_message(message)
 
         # don't ever directly mutate the tracker
         # - instead pass its events to log
@@ -891,6 +791,7 @@ class MessageProcessor:
             `False` if `action_name` is `ACTION_LISTEN_NAME` or
             `ACTION_SESSION_START_NAME`, otherwise `True`.
         """
+
         return action_name not in (ACTION_LISTEN_NAME, ACTION_SESSION_START_NAME)
 
     async def execute_side_effects(
@@ -900,8 +801,8 @@ class MessageProcessor:
         output_channel: OutputChannel,
     ) -> None:
         """Send bot messages, schedule and cancel reminders that are logged
-        in the events array.
-        """
+        in the events array."""
+
         await self._send_bot_messages(events, tracker, output_channel)
         await self._schedule_reminders(events, tracker, output_channel)
         await self._cancel_reminders(events, tracker)
@@ -913,6 +814,7 @@ class MessageProcessor:
         output_channel: OutputChannel,
     ) -> None:
         """Send all the bot messages that are logged in the events array."""
+
         for e in events:
             if not isinstance(e, BotUttered):
                 continue
@@ -974,20 +876,9 @@ class MessageProcessor:
             # case of a rejection.
             temporary_tracker = tracker.copy()
             temporary_tracker.update_with_events(prediction.events, self.domain)
-
-            run_args = inspect.getfullargspec(action.run).args
-            if "metadata" in run_args:
-                events = await action.run(
-                    output_channel,
-                    nlg,
-                    temporary_tracker,
-                    self.domain,
-                    metadata=prediction.action_metadata,
-                )
-            else:
-                events = await action.run(
-                    output_channel, nlg, temporary_tracker, self.domain
-                )
+            events = await action.run(
+                output_channel, nlg, temporary_tracker, self.domain
+            )
         except rasa.core.actions.action.ActionExecutionRejection:
             events = [
                 ActionExecutionRejected(
@@ -1041,20 +932,13 @@ class MessageProcessor:
             isinstance(event, ActionExecutionRejected) for event in events
         )
         if not action_was_rejected_manually:
-            structlogger.debug(
-                "processor.actions.policy_prediction",
-                prediction_events=copy.deepcopy(prediction.events),
-            )
+            logger.debug(f"Policy prediction ended with events '{prediction.events}'.")
             tracker.update_with_events(prediction.events, self.domain)
 
             # log the action and its produced events
             tracker.update(action.event_for_successful_execution(prediction))
 
-        structlogger.debug(
-            "processor.actions.log",
-            action_name=action.name(),
-            rasa_events=copy.deepcopy(events),
-        )
+        logger.debug(f"Action '{action.name()}' ended with events '{events}'.")
         tracker.update_with_events(events, self.domain)
 
     def _has_session_expired(self, tracker: DialogueStateTracker) -> bool:

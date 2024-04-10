@@ -6,7 +6,6 @@ import sys
 
 from rasa_sdk import __version__ as rasa_sdk_version
 from rasa.constants import MINIMUM_COMPATIBLE_VERSION
-from rasa.utils.log_utils import configure_structlog
 
 import rasa.telemetry
 import rasa.utils.io
@@ -100,9 +99,8 @@ def main() -> None:
     cmdline_arguments = arg_parser.parse_args()
 
     log_level = getattr(cmdline_arguments, "loglevel", None)
-    logging_config_file = getattr(cmdline_arguments, "logging_config_file", None)
     configure_logging_and_warnings(
-        log_level, logging_config_file, warn_only_once=True, filter_repeated_logs=True
+        log_level, warn_only_once=True, filter_repeated_logs=True
     )
 
     tf_env.setup_tf_environment()
@@ -123,12 +121,6 @@ def main() -> None:
             rasa.telemetry.initialize_telemetry()
             rasa.telemetry.initialize_error_reporting()
             plugin_manager().hook.init_telemetry(endpoints_file=endpoints_file)
-            plugin_manager().hook.init_managers(endpoints_file=endpoints_file)
-            plugin_manager().hook.init_anonymization_pipeline(
-                endpoints_file=endpoints_file
-            )
-            # configure structlog
-            configure_structlog(log_level)
 
             cmdline_arguments.func(cmdline_arguments)
         elif hasattr(cmdline_arguments, "version"):

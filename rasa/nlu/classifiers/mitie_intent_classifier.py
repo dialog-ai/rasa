@@ -52,8 +52,8 @@ class MitieIntentClassifier(GraphComponent, IntentClassifier):
         self._resource = resource
         self._clf = clf
 
-    @staticmethod
-    def required_packages() -> List[Text]:
+    @classmethod
+    def required_packages(cls) -> List[Text]:
         """Lists required dependencies (see parent class for full docstring)."""
         return ["mitie"]
 

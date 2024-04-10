@@ -197,6 +197,7 @@ class BotFrameworkInput(InputChannel):
             app_id: Bot Framework's API id
             app_password: Bot Framework application secret
         """
+
         self.app_id = app_id
         self.app_password = app_password
 
@@ -220,13 +221,13 @@ class BotFrameworkInput(InputChannel):
         self.jwt_update_time = datetime.datetime.now()
 
     def _validate_jwt_token(self, jwt_token: Text) -> None:
-        jwt_header = jwt.get_unverified_header(jwt_token)
+        jwt_header = jwt.get_unverified_header(jwt_token)  # type: ignore
         key_id = jwt_header["kid"]
         if key_id not in self.jwt_keys:
             raise InvalidKeyError(f"JWT Key with ID {key_id} not found.")
 
         key_json = self.jwt_keys[key_id]
-        public_key = RSAAlgorithm.from_jwk(key_json)
+        public_key = RSAAlgorithm.from_jwk(key_json)  # type: ignore
         jwt.decode(
             jwt_token,
             key=public_key,

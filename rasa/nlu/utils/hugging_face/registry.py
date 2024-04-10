@@ -5,7 +5,7 @@ from typing import Dict, Text, Type
 # because otherwise it logs tensorflow/pytorch versions
 logging.getLogger("transformers.file_utils").setLevel(logging.WARNING)
 
-from transformers import (  # noqa: E402
+from transformers import (  # noqa: F401, E402
     TFPreTrainedModel,
     TFBertModel,
     TFOpenAIGPTModel,
@@ -14,7 +14,6 @@ from transformers import (  # noqa: E402
     # TFXLMModel,
     TFDistilBertModel,
     TFRobertaModel,
-    TFCamembertModel,
     PreTrainedTokenizer,
     BertTokenizer,
     OpenAIGPTTokenizer,
@@ -23,9 +22,8 @@ from transformers import (  # noqa: E402
     # XLMTokenizer,
     DistilBertTokenizer,
     RobertaTokenizer,
-    CamembertTokenizer,
 )
-from rasa.nlu.utils.hugging_face.transformers_pre_post_processors import (  # noqa: E402, E501
+from rasa.nlu.utils.hugging_face.transformers_pre_post_processors import (  # noqa: F401, E402, E501
     bert_tokens_pre_processor,
     gpt_tokens_pre_processor,
     xlnet_tokens_pre_processor,
@@ -38,7 +36,6 @@ from rasa.nlu.utils.hugging_face.transformers_pre_post_processors import (  # no
     openaigpt_tokens_cleaner,
     gpt2_tokens_cleaner,
     xlnet_tokens_cleaner,
-    camembert_tokens_pre_processor,
 )
 
 
@@ -51,7 +48,6 @@ model_class_dict: Dict[Text, Type[TFPreTrainedModel]] = {
     # library https://github.com/huggingface/transformers/issues/2729
     "distilbert": TFDistilBertModel,
     "roberta": TFRobertaModel,
-    "camembert": TFCamembertModel,
 }
 model_tokenizer_dict: Dict[Text, Type[PreTrainedTokenizer]] = {
     "bert": BertTokenizer,
@@ -61,7 +57,6 @@ model_tokenizer_dict: Dict[Text, Type[PreTrainedTokenizer]] = {
     # "xlm": XLMTokenizer,
     "distilbert": DistilBertTokenizer,
     "roberta": RobertaTokenizer,
-    "camembert": CamembertTokenizer,
 }
 model_weights_defaults = {
     "bert": "rasa/LaBSE",
@@ -71,7 +66,6 @@ model_weights_defaults = {
     # "xlm": "xlm-mlm-enfr-1024",
     "distilbert": "distilbert-base-uncased",
     "roberta": "roberta-base",
-    "camembert": "camembert-base",
 }
 
 model_special_tokens_pre_processors = {
@@ -82,7 +76,6 @@ model_special_tokens_pre_processors = {
     # "xlm": xlm_tokens_pre_processor,
     "distilbert": bert_tokens_pre_processor,
     "roberta": roberta_tokens_pre_processor,
-    "camembert": camembert_tokens_pre_processor,
 }
 
 model_tokens_cleaners = {
@@ -93,7 +86,6 @@ model_tokens_cleaners = {
     # "xlm": xlm_tokens_pre_processor,
     "distilbert": bert_tokens_cleaner,  # uses the same as BERT
     "roberta": gpt2_tokens_cleaner,  # Uses the same as GPT2
-    "camembert": xlnet_tokens_cleaner,  # Removing underscores _
 }
 
 model_embeddings_post_processors = {
@@ -104,5 +96,4 @@ model_embeddings_post_processors = {
     # "xlm": xlm_embeddings_post_processor,
     "distilbert": bert_embeddings_post_processor,
     "roberta": roberta_embeddings_post_processor,
-    "camembert": roberta_embeddings_post_processor,
 }

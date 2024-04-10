@@ -11,7 +11,13 @@ FROM ${IMAGE_BASE_NAME}:base-builder-${BASE_BUILDER_IMAGE_HASH} as builder
 ##FIXME COPY --from=mitie /build/data /build/data
 
 # copy files
-COPY . /build/
+# COPY . /build/
+COPY ./README.md /build/
+COPY ./rasa /build/rasa
+COPY ./rasa_addons /build/rasa_addons
+COPY ./Makefile /build/
+COPY ./pyproject.toml /build/
+COPY ./poetry.lock /build/
 ##FIXME COPY docker/configs/config_pretrained_embeddings_spacy_en_duckling.yml /build/config.yml
 
 # change working directory
@@ -21,7 +27,9 @@ WORKDIR /build
 RUN python -m venv /opt/venv && \
   . /opt/venv/bin/activate && \
   pip install --no-cache-dir -U "pip==22.*" -U "wheel>0.38.0"
-RUN . /opt/venv/bin/activate && poetry install --extras full --no-dev --no-root --no-interaction
+RUN . /opt/venv/bin/activate && \
+  poetry install --extras full --no-dev --no-root --no-interaction && \
+  pip install telebot
 
 RUN . /opt/venv/bin/activate && make install-mitie && \
   poetry build -f wheel -n && \

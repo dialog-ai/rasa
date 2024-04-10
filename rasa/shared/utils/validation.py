@@ -117,16 +117,13 @@ class YamlValidationException(YamlException, ValueError):
         return self._line_number_for_path(current, tail) or this_line
 
 
-def validate_yaml_schema(
-    yaml_file_content: Text, schema_path: Text, package_name: Text = PACKAGE_NAME
-) -> None:
-    """Validate yaml content.
+def validate_yaml_schema(yaml_file_content: Text, schema_path: Text) -> None:
+    """
+    Validate yaml content.
 
     Args:
         yaml_file_content: the content of the yaml file to be validated
         schema_path: the schema of the yaml file
-        package_name: the name of the package the schema is located in. defaults
-            to `rasa`.
     """
     from pykwalify.core import Core
     from pykwalify.errors import SchemaError
@@ -149,7 +146,7 @@ def validate_yaml_schema(
     except (YAMLError, DuplicateKeyError) as e:
         raise YamlSyntaxException(underlying_yaml_exception=e)
 
-    schema_file = pkg_resources.resource_filename(package_name, schema_path)
+    schema_file = pkg_resources.resource_filename(PACKAGE_NAME, schema_path)
     schema_utils_file = pkg_resources.resource_filename(
         PACKAGE_NAME, RESPONSES_SCHEMA_FILE
     )
@@ -170,7 +167,6 @@ def validate_yaml_schema(
     )
 
     try:
-        ## FIXME: lonycell - validation yaml format from admin ui.
         c.validate(raise_exception=True)
     except SchemaError:
         raise YamlValidationException(
@@ -221,6 +217,7 @@ def validate_training_data_format_version(
         `True` if the file can be processed by current version of Rasa Open Source,
         `False` otherwise.
     """
+
     if filename:
         filename = os.path.abspath(filename)
 

@@ -33,7 +33,8 @@ def normalize_utter_action(action_name: Text) -> Text:
 
 
 class StoryResponsePrefixConverter(TrainingDataConverter):
-    """Converter responsible for ensuring that retrieval intent actions in stories
+    """
+    Converter responsible for ensuring that retrieval intent actions in stories
     start with `utter_` instead of `respond_`.
     """
 
@@ -75,7 +76,8 @@ class StoryResponsePrefixConverter(TrainingDataConverter):
 
 
 class DomainResponsePrefixConverter(TrainingDataConverter):
-    """Converter responsible for ensuring that retrieval intent actions in domain
+    """
+    Converter responsible for ensuring that retrieval intent actions in domain
     start with `utter_` instead of `respond_`.
     """
 

@@ -1,12 +1,11 @@
-import asyncio
-import json
 import logging
 from copy import deepcopy
 from sanic import Blueprint, response
 from sanic.request import Request
 from sanic.response import HTTPResponse
-from aiogram import Bot
-from aiogram.types import (
+from telebot import TeleBot
+from telebot.apihelper import ApiTelegramException
+from telebot.types import (
     InlineKeyboardButton,
     Update,
     InlineKeyboardMarkup,
@@ -14,7 +13,6 @@ from aiogram.types import (
     ReplyKeyboardMarkup,
     Message,
 )
-from aiogram.utils.exceptions import TelegramAPIError
 from typing import Dict, Text, Any, List, Optional, Callable, Awaitable
 
 from rasa.core.channels.channel import InputChannel, UserMessage, OutputChannel
@@ -25,7 +23,7 @@ from rasa.shared.exceptions import RasaException
 logger = logging.getLogger(__name__)
 
 
-class TelegramOutput(Bot, OutputChannel):
+class TelegramOutput(TeleBot, OutputChannel):
     """Output channel for Telegram."""
 
     # skipcq: PYL-W0236
@@ -39,15 +37,15 @@ class TelegramOutput(Bot, OutputChannel):
     async def send_text_message(
         self, recipient_id: Text, text: Text, **kwargs: Any
     ) -> None:
-        """Sends text message."""
+        """Send a text message."""
         for message_part in text.strip().split("\n\n"):
-            await self.send_message(recipient_id, message_part)
+            self.send_message(recipient_id, message_part)
 
     async def send_image_url(
         self, recipient_id: Text, image: Text, **kwargs: Any
     ) -> None:
-        """Sends an image."""
-        await self.send_photo(recipient_id, image)
+        """Send an image."""
+        self.send_photo(recipient_id, image)
 
     async def send_text_with_buttons(
         self,
@@ -102,12 +100,11 @@ class TelegramOutput(Bot, OutputChannel):
             )
             return
 
-        await self.send_message(recipient_id, text, reply_markup=reply_markup)
+        self.send_message(recipient_id, text, reply_markup=reply_markup)
 
     async def send_custom_json(
         self, recipient_id: Text, json_message: Dict[Text, Any], **kwargs: Any
     ) -> None:
-        """Sends a message with a custom json payload."""
         json_message = deepcopy(json_message)
 
         recipient_id = json_message.pop("chat_id", recipient_id)
@@ -143,11 +140,11 @@ class TelegramOutput(Bot, OutputChannel):
             if all(json_message.get(p) is not None for p in params):
                 args = [json_message.pop(p) for p in params]
                 api_call = getattr(self, send_functions[params])
-                await api_call(recipient_id, *args, **json_message)
+                api_call(recipient_id, *args, **json_message)
 
 
 class TelegramInput(InputChannel):
-    """Telegram input channel."""
+    """Telegram input channel"""
 
     @classmethod
     def name(cls) -> Text:
@@ -204,7 +201,7 @@ class TelegramInput(InputChannel):
 
         @telegram_webhook.route("/set_webhook", methods=["GET", "POST"])
         async def set_webhook(_: Request) -> HTTPResponse:
-            s = await out_channel.set_webhook(self.webhook_url)
+            s = out_channel.setWebhook(self.webhook_url)
             if s:
                 logger.info("Webhook Setup Successful")
                 return response.text("Webhook setup successful")
@@ -217,11 +214,8 @@ class TelegramInput(InputChannel):
             if request.method == "POST":
 
                 request_dict = request.json
-                if isinstance(request_dict, Text):
-                    request_dict = json.loads(request_dict)
-                update = Update(**request_dict)
-                credentials = await out_channel.get_me()
-                if not credentials.username == self.verify:
+                update = Update.de_json(request_dict)
+                if not out_channel.get_me().username == self.verify:
                     logger.debug("Invalid access token, check it matches Telegram")
                     return response.text("failed")
 
@@ -289,8 +283,8 @@ class TelegramInput(InputChannel):
         channel = TelegramOutput(self.access_token)
 
         try:
-            asyncio.run(channel.set_webhook(url=self.webhook_url))
-        except TelegramAPIError as error:
+            channel.set_webhook(url=self.webhook_url)
+        except ApiTelegramException as error:
             raise RasaException(
                 "Failed to set channel webhook: " + str(error)
             ) from error

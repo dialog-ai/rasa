@@ -32,19 +32,12 @@ mapping:
         allowempty: True
       - type: "str"
   actions:
-    type: seq
-    matching: "any"
-    seq:
-      - type: str
-      - type: map
-        mapping:
-          regex;([A-Za-z]+):
-            type: map
-            mapping:
-              send_domain:
-                type: "bool"
+    type: "seq"
+    sequence:
+    - type: "str"
+      required: True
   responses:
-    # see shared/nlu/training_data/schemas/responses.yml
+    # see utils/schemas/responses.yml
     include: responses
 
   slots:
@@ -106,7 +99,7 @@ mapping:
                         mapping:
                           active_loop:
                             type: "str"
-                            nullable: True
+                            required: True
                           requested_slot:
                             type: "str"
   forms:

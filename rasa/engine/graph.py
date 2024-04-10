@@ -4,13 +4,9 @@ import dataclasses
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 import logging
-from typing import Any, Callable, Dict, List, Optional, Text, Type, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Text, Type, Tuple
 
-from rasa.engine.exceptions import (
-    GraphComponentException,
-    GraphRunError,
-    GraphSchemaException,
-)
+from rasa.engine.exceptions import GraphComponentException, GraphSchemaException
 import rasa.shared.utils.common
 import rasa.utils.common
 from rasa.engine.storage.resource import Resource
@@ -254,15 +250,6 @@ class GraphComponent(ABC):
         """Any extra python dependencies required for this component to run."""
         return []
 
-    @classmethod
-    def fingerprint_addon(cls, config: Dict[str, Any]) -> Optional[str]:
-        """Adds additional data to the fingerprint calculation.
-
-        This is useful if a component uses external data that is not provided
-        by the graph.
-        """
-        return None
-
 
 class GraphNodeHook(ABC):
     """Holds functionality to be run before and after a `GraphNode`."""
@@ -438,41 +425,22 @@ class GraphNode:
         return Resource(self._node_name)
 
     def __call__(
-        self, *inputs_from_previous_nodes: Union[Tuple[Text, Any], Text]
+        self, *inputs_from_previous_nodes: Tuple[Text, Any]
     ) -> Tuple[Text, Any]:
         """Calls the `GraphComponent` run method when the node executes in the graph.
 
         Args:
             *inputs_from_previous_nodes: The output of all parent nodes. Each is a
                 dictionary with a single item mapping the node's name to its output.
-                If the node couldn't be resolved and has no output, the node name is
-                provided instead of a tuple.
 
         Returns:
             The node name and its output.
         """
-        # filter out arguments that dask couldn't lookup
-        received_inputs: Dict[Text, Any] = {}
-        for i in inputs_from_previous_nodes:
-            if isinstance(i, tuple):
-                node_name, node_output = i
-                received_inputs[node_name] = node_output
-            else:
-                logger.warning(
-                    f"Node '{i}' was not resolved, there is no putput. "
-                    f"Another component should have provided this as an "
-                    f"output."
-                )
+        received_inputs: Dict[Text, Any] = dict(inputs_from_previous_nodes)
 
         kwargs = {}
-        for input_name, input_provider_node_name in self._inputs.items():
-            if input_provider_node_name not in received_inputs:
-                raise GraphRunError(
-                    f"Missing input to run node '{self._node_name}'. "
-                    f"Expected input '{input_provider_node_name}' to "
-                    f"provide parameter '{input_name}'."
-                )
-            kwargs[input_name] = received_inputs[input_provider_node_name]
+        for input_name, input_node in self._inputs.items():
+            kwargs[input_name] = received_inputs[input_node]
 
         input_hook_outputs = self._run_before_hooks(kwargs)
 
@@ -585,8 +553,6 @@ class GraphModelConfiguration:
     train_schema: GraphSchema
     predict_schema: GraphSchema
     training_type: TrainingType
-    assistant_id: Optional[Text]
     language: Optional[Text]
     core_target: Optional[Text]
     nlu_target: Optional[Text]
-    spaces: Optional[Dict[Text, Text]] = None

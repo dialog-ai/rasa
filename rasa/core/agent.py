@@ -3,6 +3,7 @@ from asyncio import AbstractEventLoop, CancelledError
 import functools
 import logging
 import os
+import tempfile
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Text, Union
 import uuid
@@ -27,7 +28,6 @@ from rasa.exceptions import ModelNotFound
 from rasa.nlu.utils import is_url
 from rasa.shared.exceptions import RasaException
 import rasa.shared.utils.io
-from rasa.utils.common import TempDirectoryPath, get_temp_dir_name
 from rasa.utils.endpoints import EndpointConfig
 
 from rasa.core.tracker_store import TrackerStore
@@ -76,7 +76,7 @@ async def _update_model_from_server(model_server: EndpointConfig, agent: Agent) 
     if not is_url(model_server.url):
         raise aiohttp.InvalidURL(model_server.url)
 
-    with TempDirectoryPath(get_temp_dir_name()) as temporary_directory:
+    with tempfile.TemporaryDirectory() as temporary_directory:
         try:
             new_fingerprint = await _pull_model_and_fingerprint(
                 model_server, agent.fingerprint, temporary_directory
@@ -112,53 +112,59 @@ async def _pull_model_and_fingerprint(
 
     logger.debug(f"Requesting model from server {model_server.url}...")
 
-    try:
-        params = model_server.combine_parameters()
-        async with model_server.session.request(
-            "GET",
-            model_server.url,
-            timeout=DEFAULT_REQUEST_TIMEOUT,
-            headers=headers,
-            params=params,
-        ) as resp:
-            if resp.status in [204, 304]:
-                logger.debug(
-                    "Model server returned {} status code, "
-                    "indicating that no new model is available. "
-                    "Current fingerprint: {}"
-                    "".format(resp.status, fingerprint)
+    async with model_server.session() as session:
+        try:
+            params = model_server.combine_parameters()
+            async with session.request(
+                "GET",
+                model_server.url,
+                timeout=DEFAULT_REQUEST_TIMEOUT,
+                headers=headers,
+                params=params,
+            ) as resp:
+
+                if resp.status in [204, 304]:
+                    logger.debug(
+                        "Model server returned {} status code, "
+                        "indicating that no new model is available. "
+                        "Current fingerprint: {}"
+                        "".format(resp.status, fingerprint)
+                    )
+                    return None
+                elif resp.status == 404:
+                    logger.debug(
+                        "Model server could not find a model at the requested "
+                        "endpoint '{}'. It's possible that no model has been "
+                        "trained, or that the requested tag hasn't been "
+                        "assigned.".format(model_server.url)
+                    )
+                    return None
+                elif resp.status != 200:
+                    logger.debug(
+                        "Tried to fetch model from server, but server response "
+                        "status code is {}. We'll retry later..."
+                        "".format(resp.status)
+                    )
+                    return None
+
+                model_path = Path(model_directory) / resp.headers.get(
+                    "filename", "model.tar.gz"
                 )
-                return None
-            elif resp.status == 404:
-                logger.debug(
-                    "Model server could not find a model at the requested "
-                    "endpoint '{}'. It's possible that no model has been "
-                    "trained, or that the requested tag hasn't been "
-                    "assigned.".format(model_server.url)
-                )
-                return None
-            elif resp.status != 200:
-                logger.debug(
-                    "Tried to fetch model from server, but server response "
-                    "status code is {}. We'll retry later..."
-                    "".format(resp.status)
-                )
-                return None
-            model_path = Path(model_directory) / resp.headers.get(
-                "filename", "model.tar.gz"
+                with open(model_path, "wb") as file:
+                    file.write(await resp.read())
+
+                logger.debug("Saved model to '{}'".format(os.path.abspath(model_path)))
+
+                # return the new fingerprint
+                return resp.headers.get("ETag")
+
+        except aiohttp.ClientError as e:
+            logger.debug(
+                "Tried to fetch model from server, but "
+                "couldn't reach server. We'll retry later... "
+                "Error: {}.".format(e)
             )
-            with open(model_path, "wb") as file:
-                file.write(await resp.read())
-            logger.debug("Saved model to '{}'".format(os.path.abspath(model_path)))
-            # return the new fingerprint
-            return resp.headers.get("ETag")
-    except aiohttp.ClientError as e:
-        logger.debug(
-            "Tried to fetch model from server, but "
-            "couldn't reach server. We'll retry later... "
-            "Error: {}.".format(e)
-        )
-        return None
+            return None
 
 
 async def _run_model_pulling_worker(model_server: EndpointConfig, agent: Agent) -> None:
@@ -258,7 +264,7 @@ async def load_agent(
         return agent
 
     except Exception as e:
-        logger.error(f"Could not load model due to {e}.", exc_info=True)
+        logger.error(f"Could not load model due to {e}.")
         return agent
 
 
@@ -387,7 +393,8 @@ class Agent:
         Returns:
             The parsed message.
 
-        Example:
+            Example:
+
                 {\
                     "text": '/greet{"name":"Rasa"}',\
                     "intent": {"name": "greet", "confidence": 1.0},\
@@ -535,7 +542,7 @@ class Agent:
         persistor = get_persistor(self.remote_storage)
 
         if persistor is not None:
-            with TempDirectoryPath(get_temp_dir_name()) as temporary_directory:
+            with tempfile.TemporaryDirectory() as temporary_directory:
                 persistor.retrieve(model_name, temporary_directory)
                 self.load_model(temporary_directory)
 

@@ -102,8 +102,6 @@ class Tokenizer(GraphComponent, abc.ABC):
         self.token_pattern_regex = None
         if token_pattern:
             self.token_pattern_regex = re.compile(token_pattern)
-        # split intent to prefix and suffix greedily, None means don't split
-        self.prefix_separator_symbol = config.get("prefix_separator_symbol")
 
     @classmethod
     def create(
@@ -163,15 +161,7 @@ class Tokenizer(GraphComponent, abc.ABC):
         return words
 
     def _split_name(self, message: Message, attribute: Text = INTENT) -> List[Token]:
-        orig_text = message.get(attribute)
-
-        if (
-            self.prefix_separator_symbol is not None
-            and self.prefix_separator_symbol in orig_text
-        ):
-            prefix, text = orig_text.split(self.prefix_separator_symbol, maxsplit=1)
-        else:
-            prefix, text = None, orig_text
+        text = message.get(attribute)
 
         # for INTENT_RESPONSE_KEY attribute,
         # first split by RESPONSE_IDENTIFIER_DELIMITER
@@ -184,10 +174,7 @@ class Tokenizer(GraphComponent, abc.ABC):
         else:
             words = self._tokenize_on_split_symbol(text)
 
-        if prefix is not None:
-            words = self._tokenize_on_split_symbol(prefix) + words
-
-        return self._convert_words_to_tokens(words, orig_text)
+        return self._convert_words_to_tokens(words, text)
 
     def _apply_token_pattern(self, tokens: List[Token]) -> List[Token]:
         """Apply the token pattern to the given tokens.

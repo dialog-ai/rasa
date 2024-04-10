@@ -105,7 +105,6 @@ from rasa.utils.tensorflow.constants import (
     CONSTRAIN_SIMILARITIES,
     MODEL_CONFIDENCE,
     SOFTMAX,
-    RUN_EAGERLY,
 )
 
 logger = logging.getLogger(__name__)
@@ -283,11 +282,6 @@ class DIETClassifier(GraphComponent, IntentClassifier, EntityExtractorMixin):
             # Note that renormalization only makes sense if confidences are generated
             # via `softmax`.
             RENORMALIZE_CONFIDENCES: False,
-            # Determines whether to construct the model graph or not.
-            # This is advantageous when the model is only trained or inferred for
-            # a few steps, as the compilation of the graph tends to take more time than
-            # running it. It is recommended to not adjust the optimization parameter.
-            RUN_EAGERLY: False,
         }
 
     def __init__(
@@ -418,6 +412,7 @@ class DIETClassifier(GraphComponent, IntentClassifier, EntityExtractorMixin):
         training_data: TrainingData, attribute: Text
     ) -> Dict[Text, int]:
         """Create label_id dictionary."""
+
         distinct_label_ids = {
             example.get(attribute) for example in training_data.intent_examples
         } - {None}
@@ -433,6 +428,7 @@ class DIETClassifier(GraphComponent, IntentClassifier, EntityExtractorMixin):
         self, training_data: TrainingData
     ) -> List[EntityTagSpec]:
         """Create entity tag specifications with their respective tag id mappings."""
+
         _tag_specs = []
 
         for tag_name in POSSIBLE_TAGS:
@@ -496,6 +492,7 @@ class DIETClassifier(GraphComponent, IntentClassifier, EntityExtractorMixin):
         self, labels_example: List[Message], attribute: Text
     ) -> bool:
         """Checks if all labels have features set."""
+
         return all(
             label_example.features_present(
                 attribute, self.component_config[FEATURIZERS]
@@ -608,10 +605,16 @@ class DIETClassifier(GraphComponent, IntentClassifier, EntityExtractorMixin):
         logger.debug("No label features found. Computing default label features.")
 
         eye_matrix = np.eye(len(labels_example), dtype=np.float32)
+        # [numpy-upgrade] type ignore can be removed after upgrading to numpy 1.23
         # add sequence dimension to one-hot labels
         return [
             FeatureArray(
-                np.array([np.expand_dims(a, 0) for a in eye_matrix]),
+                np.array(
+                    [
+                        np.expand_dims(a, 0)  # type: ignore[no-untyped-call]
+                        for a in eye_matrix
+                    ]
+                ),
                 number_of_dimensions=3,
             )
         ]
@@ -661,6 +664,7 @@ class DIETClassifier(GraphComponent, IntentClassifier, EntityExtractorMixin):
             )
 
         label_ids = np.array([idx for (idx, _) in labels_idx_examples])
+        # [numpy-upgrade] type ignore can be removed after upgrading to numpy 1.23
         # explicitly add last dimension to label_ids
         # to track correctly dynamic sequences
         label_data.add_features(
@@ -668,7 +672,7 @@ class DIETClassifier(GraphComponent, IntentClassifier, EntityExtractorMixin):
             LABEL_SUB_KEY,
             [
                 FeatureArray(
-                    np.expand_dims(label_ids, -1),
+                    np.expand_dims(label_ids, -1),  # type: ignore[no-untyped-call]
                     number_of_dimensions=2,
                 )
             ],
@@ -796,12 +800,13 @@ class DIETClassifier(GraphComponent, IntentClassifier, EntityExtractorMixin):
                     label_ids.append(label_id_dict[example.get(label_attribute)])
             # explicitly add last dimension to label_ids
             # to track correctly dynamic sequences
+            # [numpy-upgrade] type ignore can be removed after upgrading to numpy 1.23
             model_data.add_features(
                 LABEL_KEY,
                 LABEL_SUB_KEY,
                 [
                     FeatureArray(
-                        np.expand_dims(label_ids, -1),
+                        np.expand_dims(label_ids, -1),  # type: ignore[no-untyped-call]
                         number_of_dimensions=2,
                     )
                 ],
@@ -832,10 +837,7 @@ class DIETClassifier(GraphComponent, IntentClassifier, EntityExtractorMixin):
 
         Performs sanity checks on training data, extracts encodings for labels.
         """
-        if (
-            self.component_config[BILOU_FLAG]
-            and self.component_config[ENTITY_RECOGNITION]
-        ):
+        if self.component_config[BILOU_FLAG]:
             bilou_utils.apply_bilou_schema(training_data)
 
         label_id_index_mapping = self._label_id_index_mapping(
@@ -869,7 +871,15 @@ class DIETClassifier(GraphComponent, IntentClassifier, EntityExtractorMixin):
 
     @staticmethod
     def _check_enough_labels(model_data: RasaModelData) -> bool:
-        return len(np.unique(model_data.get(LABEL_KEY, LABEL_SUB_KEY))) >= 2
+        # [numpy-upgrade] type ignore can be removed after upgrading to numpy 1.23
+        return (
+            len(
+                np.unique(  # type: ignore[no-untyped-call]
+                    model_data.get(LABEL_KEY, LABEL_SUB_KEY)
+                )
+            )
+            >= 2
+        )
 
     def train(self, training_data: TrainingData) -> Resource:
         """Train the embedding intent classifier on a data set."""
@@ -908,10 +918,7 @@ class DIETClassifier(GraphComponent, IntentClassifier, EntityExtractorMixin):
             # No pre-trained model to load from. Create a new instance of the model.
             self.model = self._instantiate_model_class(model_data)
             self.model.compile(
-                optimizer=tf.keras.optimizers.Adam(
-                    self.component_config[LEARNING_RATE]
-                ),
-                run_eagerly=self.component_config[RUN_EAGERLY],
+                optimizer=tf.keras.optimizers.Adam(self.component_config[LEARNING_RATE])
             )
         else:
             if self.model is None:
@@ -1632,7 +1639,7 @@ class DIET(TransformerRasaModel):
             sequence_feature_lengths + sentence_feature_lengths
         )
 
-        if self.config[MASKED_LM] and self._training:
+        if self.config[MASKED_LM]:
             loss, acc = self._mask_loss(
                 text_transformed, text_in, text_seq_ids, mlm_mask_boolean_text, TEXT
             )

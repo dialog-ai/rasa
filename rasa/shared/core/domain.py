@@ -38,13 +38,7 @@ from rasa.shared.constants import (
     RESPONSE_CONDITION,
 )
 import rasa.shared.core.constants
-from rasa.shared.core.constants import (
-    ACTION_SHOULD_SEND_DOMAIN,
-    SlotMappingType,
-    MAPPING_TYPE,
-    MAPPING_CONDITIONS,
-    ACTIVE_LOOP,
-)
+from rasa.shared.core.constants import SlotMappingType, MAPPING_TYPE, MAPPING_CONDITIONS
 from rasa.shared.exceptions import (
     RasaException,
     YamlException,
@@ -213,7 +207,6 @@ class Domain:
     def from_yaml(cls, yaml: Text, original_filename: Text = "") -> "Domain":
         """Loads the `Domain` from YAML text after validating it."""
         try:
-            ## FIXME: lonycell - inspection!
             rasa.shared.utils.validation.validate_yaml_schema(yaml, DOMAIN_SCHEMA_FILE)
 
             data = rasa.shared.utils.io.read_yaml(yaml)
@@ -246,15 +239,8 @@ class Domain:
         if domain_slots:
             rasa.shared.core.slot_mappings.validate_slot_mappings(domain_slots)
         slots = cls.collect_slots(domain_slots)
-        domain_actions = data.get(KEY_ACTIONS, [])
-        actions = cls._collect_action_names(domain_actions)
 
-        additional_arguments = {
-            **data.get("config", {}),
-            "actions_which_explicitly_need_domain": cls._collect_actions_which_explicitly_need_domain(  # noqa: E501
-                domain_actions
-            ),
-        }
+        additional_arguments = data.get("config", {})
         session_config = cls._get_session_config(data.get(SESSION_CONFIG_KEY, {}))
         intents = data.get(KEY_INTENTS, {})
 
@@ -266,7 +252,7 @@ class Domain:
             entities=data.get(KEY_ENTITIES, {}),
             slots=slots,
             responses=responses,
-            action_names=actions,
+            action_names=data.get(KEY_ACTIONS, []),
             forms=data.get(KEY_FORMS, {}),
             data=Domain._cleaned_data(data),
             action_texts=data.get(KEY_E2E_ACTIONS, []),
@@ -369,7 +355,7 @@ class Domain:
         merge_func_mappings: Dict[Text, Callable[..., Any]] = {
             KEY_INTENTS: rasa.shared.utils.common.merge_lists_of_dicts,
             KEY_ENTITIES: rasa.shared.utils.common.merge_lists_of_dicts,
-            KEY_ACTIONS: rasa.shared.utils.common.merge_lists_of_dicts,
+            KEY_ACTIONS: rasa.shared.utils.common.merge_lists,
             KEY_E2E_ACTIONS: rasa.shared.utils.common.merge_lists,
             KEY_FORMS: rasa.shared.utils.common.merge_dicts,
             KEY_RESPONSES: rasa.shared.utils.common.merge_dicts,
@@ -514,7 +500,7 @@ class Domain:
             `used_entities` since this is the expected format of the intent
             when used internally.
         """
-        name, properties = next(iter(intent.items()))
+        name, properties = list(intent.items())[0]
 
         if properties:
             properties.setdefault(USE_ENTITIES_KEY, True)
@@ -705,7 +691,7 @@ class Domain:
                 }
             }
         else:
-            intent_name = next(iter(intent.keys()))
+            intent_name = list(intent.keys())[0]
 
         return (
             intent_name,
@@ -737,9 +723,8 @@ class Domain:
         action_texts: Optional[List[Text]] = None,
         store_entities_as_slots: bool = True,
         session_config: SessionConfig = SessionConfig.default(),
-        **kwargs: Any,
     ) -> None:
-        """Create a `Domain`.
+        """Creates a `Domain`.
 
         Args:
             intents: Intent labels.
@@ -783,9 +768,6 @@ class Domain:
         self.session_config = session_config
 
         self._custom_actions = action_names
-        self._actions_which_explicitly_need_domain = (
-            kwargs.get("actions_which_explicitly_need_domain") or []
-        )
 
         # only includes custom actions and utterance actions
         self.user_actions = self._combine_with_responses(action_names, responses)
@@ -847,7 +829,7 @@ class Domain:
             User-defined intents that are default intents.
         """
         intent_names: Set[Text] = {
-            next(iter(intent.keys())) if isinstance(intent, dict) else intent
+            list(intent.keys())[0] if isinstance(intent, dict) else intent
             for intent in intents
         }
         return sorted(
@@ -904,7 +886,7 @@ class Domain:
     ) -> List[Union[Text, Dict]]:
         def sort(elem: Union[Text, Dict]) -> Union[Text, Dict]:
             if isinstance(elem, dict):
-                return next(iter(elem.keys()))
+                return list(elem.keys())[0]
             elif isinstance(elem, str):
                 return elem
 
@@ -997,7 +979,7 @@ class Domain:
             in self.action_names_or_texts
         ):
             logger.warning(
-                "You are using an experimental feature: Action '{}'!".format(
+                "You are using an experiential feature: Action '{}'!".format(
                     rasa.shared.core.constants.DEFAULT_KNOWLEDGE_BASE_ACTION
                 )
             )
@@ -1048,6 +1030,7 @@ class Domain:
     @rasa.shared.utils.common.lazy_property
     def slot_states(self) -> List[Text]:
         """Returns all available slot state strings."""
+
         return [
             f"{slot.name}_{feature_index}"
             for slot in self.slots
@@ -1410,11 +1393,9 @@ class Domain:
                 matching_entities = []
 
                 for mapping in slot.mappings:
-                    mapping_conditions = mapping.get(MAPPING_CONDITIONS)
-                    if mapping[MAPPING_TYPE] != str(SlotMappingType.FROM_ENTITY) or (
-                        mapping_conditions
-                        and mapping_conditions[0].get(ACTIVE_LOOP) is not None
-                    ):
+                    if mapping[MAPPING_TYPE] != str(
+                        SlotMappingType.FROM_ENTITY
+                    ) or mapping.get(MAPPING_CONDITIONS):
                         continue
 
                     for entity in entities:
@@ -1649,6 +1630,7 @@ class Domain:
         `entity_warnings`, `action_warnings` and `slot_warnings`. Excludes domain slots
         from domain warnings in case they are not featurized.
         """
+
         intent_warnings = self._get_symmetric_difference(self.intents, intents)
         entity_warnings = self._get_symmetric_difference(self.entities, entities)
         action_warnings = self._get_symmetric_difference(
@@ -1696,9 +1678,10 @@ class Domain:
 
         def get_exception_message(
             duplicates: Optional[List[Tuple[List[Text], Text]]] = None,
-            mappings: Optional[List[Tuple[Text, Text]]] = None,
+            mappings: List[Tuple[Text, Text]] = None,
         ) -> Text:
             """Return a message given a list of error locations."""
+
             message = ""
             if duplicates:
                 message += get_duplicate_exception_message(duplicates)
@@ -1710,6 +1693,7 @@ class Domain:
 
         def get_mapping_exception_message(mappings: List[Tuple[Text, Text]]) -> Text:
             """Return a message given a list of duplicates."""
+
             message = ""
             for name, action_name in mappings:
                 if message:
@@ -1865,18 +1849,6 @@ class Domain:
 
         return (total_mappings, custom_mappings, conditional_mappings)
 
-    def does_custom_action_explicitly_need_domain(self, action_name: Text) -> bool:
-        """Assert if action has explicitly stated that it needs domain.
-
-        Args:
-            action_name: Name of the action to be checked
-
-        Returns:
-            True if action has explicitly stated that it needs domain.
-            Otherwise, it returns false.
-        """
-        return action_name in self._actions_which_explicitly_need_domain
-
     def __repr__(self) -> Text:
         """Returns text representation of object."""
         return (
@@ -1885,40 +1857,6 @@ class Domain:
             f"{len(self.slots)} slots, "
             f"{len(self.entities)} entities, {len(self.form_names)} forms"
         )
-
-    @staticmethod
-    def _collect_action_names(
-        actions: List[Union[Text, Dict[Text, Any]]]
-    ) -> List[Text]:
-        action_names: List[Text] = []
-
-        for action in actions:
-            if isinstance(action, dict):
-                action_names.extend(list(action.keys()))
-            elif isinstance(action, str):
-                action_names += [action]
-
-        return action_names
-
-    @staticmethod
-    def _collect_actions_which_explicitly_need_domain(
-        actions: List[Union[Text, Dict[Text, Any]]]
-    ) -> List[Text]:
-        action_names: List[Text] = []
-
-        for action in actions:
-            if isinstance(action, dict):
-                for action_name, action_config in action.items():
-                    should_send_domain = action_config.get(
-                        ACTION_SHOULD_SEND_DOMAIN, False
-                    )
-                    if should_send_domain:
-                        action_names += [action_name]
-
-            elif action.startswith("validate_"):
-                action_names += [action]
-
-        return action_names
 
 
 def warn_about_duplicates_found_during_domain_merging(

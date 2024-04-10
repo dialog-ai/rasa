@@ -105,6 +105,7 @@ class WebexTeamsInput(InputChannel):
         @webexteams_webhook.route("/webhook", methods=["POST"])
         async def webhook(request: Request) -> HTTPResponse:
             """Respond to inbound webhook HTTP POST from Webex Teams."""
+
             logger.debug("Received webex webhook call")
             # Get the POST data sent from Webex Teams
             json_data = request.json

@@ -9,12 +9,7 @@ from rasa.engine.storage.resource import Resource
 from rasa.engine.storage.storage import ModelStorage
 from rasa.shared.constants import DOCS_URL_COMPONENTS
 from rasa.nlu.classifiers.classifier import IntentClassifier
-from rasa.shared.nlu.constants import (
-    INTENT,
-    TEXT,
-    INTENT_NAME_KEY,
-    PREDICTED_CONFIDENCE_KEY,
-)
+from rasa.shared.nlu.constants import INTENT, TEXT
 import rasa.shared.utils.io
 from rasa.shared.nlu.training_data.training_data import TrainingData
 from rasa.shared.nlu.training_data.message import Message
@@ -124,17 +119,14 @@ class KeywordIntentClassifier(GraphComponent, IntentClassifier):
             )
 
     def process(self, messages: List[Message]) -> List[Message]:
-        """Sets the message intent and add it to the output if it exists."""
+        """Set the message intent and add it to the output if it exists."""
         for message in messages:
             intent_name = self._map_keyword_to_intent(message.get(TEXT))
 
             confidence = 0.0 if intent_name is None else 1.0
-            intent = {
-                INTENT_NAME_KEY: intent_name,
-                PREDICTED_CONFIDENCE_KEY: confidence,
-            }
+            intent = {"name": intent_name, "confidence": confidence}
 
-            if message.get(INTENT) is None or intent_name is not None:
+            if message.get(INTENT) is None or intent is not None:
                 message.set(INTENT, intent, add_to_output=True)
 
         return messages

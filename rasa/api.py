@@ -17,8 +17,8 @@ if TYPE_CHECKING:
 def run(
     model: "Text",
     endpoints: "Text",
-    connector: "Optional[Text]" = None,
-    credentials: "Optional[Text]" = None,
+    connector: "Text" = None,
+    credentials: "Text" = None,
     **kwargs: "Dict[Text, Any]",
 ) -> None:
     """Runs a Rasa model.

@@ -1,6 +1,5 @@
 from __future__ import annotations
 from typing import Dict, Text, Union, List, Tuple
-
 from rasa.utils.io import WriteRow
 from pathlib import Path
 import csv
@@ -13,12 +12,15 @@ from rasa.core.evaluation.marker_base import EventMetaData
 
 def compute_statistics(
     values: List[Union[float, int]]
-) -> Dict[Text, Union[int, float, np.floating]]:
+) -> Dict[Text, Union[int, float]]:
     """Computes some statistics over the given numbers."""
     return {
         "count": len(values) if values else 0,
         "mean": np.mean(values) if values else np.nan,
-        "median": np.median(values) if values else np.nan,
+        # [numpy-upgrade] type ignore can be removed after upgrading to numpy 1.23
+        "median": (
+            np.median(values) if values else np.nan  # type: ignore[no-untyped-call]
+        ),
         "min": min(values) if values else np.nan,
         "max": max(values) if values else np.nan,
     }
@@ -279,7 +281,8 @@ class MarkerStatistics:
         elif np.isnan(statistic_value):
             value_str = str(np.nan)
         else:
-            value_str = np.round(statistic_value, 3)
+            # [numpy-upgrade] type ignore can be removed after upgrading to numpy 1.23
+            value_str = np.round(statistic_value, 3)  # type: ignore[no-untyped-call]
         table_writer.writerow(
             [
                 str(item)

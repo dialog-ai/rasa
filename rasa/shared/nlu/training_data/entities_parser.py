@@ -22,9 +22,9 @@ GROUP_ENTITY_DICT_LIST = "list_entity_dicts"
 GROUP_ENTITY_TEXT = "entity_text"
 GROUP_COMPLETE_MATCH = 0
 
-# regex for: `[entity_text]((entity_type(:entity_synonym)?)|{entity_dict}|[list_entity_dicts])` # noqa: E501
+# regex for: `[entity_text]((entity_type(:entity_synonym)?)|{entity_dict}|[list_entity_dicts])` # noqa: E501, W505
 ENTITY_REGEX = re.compile(
-    r"\[(?P<entity_text>[^\]]+?)\](\((?P<entity>[^:)]+?)(?:\:(?P<value>[^)]+))?\)|\{(?P<entity_dict>[^}]+?)\}|\[(?P<list_entity_dicts>.*?)\])"  # noqa: E501
+    r"\[(?P<entity_text>[^\]]+?)\](\((?P<entity>[^:)]+?)(?:\:(?P<value>[^)]+))?\)|\{(?P<entity_dict>[^}]+?)\}|\[(?P<list_entity_dicts>.*?)\])"  # noqa: E501, W505
 )
 
 SINGLE_ENTITY_DICT = re.compile(r"{(?P<entity_dict>[^}]+?)\}")
@@ -203,6 +203,7 @@ def replace_entities(training_example: Text) -> Text:
 
 def parse_training_example(example: Text, intent: Optional[Text] = None) -> "Message":
     """Extract entities and synonyms, and convert to plain text."""
+
     entities = find_entities_in_training_example(example)
     plain_text = replace_entities(example)
 
