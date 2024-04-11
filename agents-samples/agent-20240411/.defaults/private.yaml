@@ -1,0 +1,96 @@
+#private/defaults/private.yaml
+
+#============================================================================================================================
+credentials:
+  rasa_addons.core.channels.webchat.WebchatInput:
+    session_persistence: true
+    base_url: https://rasa-core.utopsoft.co.kr
+    socket_path: /socket.io/
+  rasa_addons.core.channels.bot_regression_test.BotRegressionTestInput: {}
+
+#============================================================================================================================
+instance: http://rasa:5005
+
+#============================================================================================================================
+bfApiHost: http://botfront-api:8080
+
+#============================================================================================================================
+endpoints:
+  nlg:
+    type: rasa_addons.core.nlg.GraphQLNaturalLanguageGenerator
+    url: http://botfront:3000/graphql
+  action_endpoint:
+    url: http://actions:5055/webhook
+  tracker_store:
+    store_type:  rasa_addons.core.tracker_stores.botfront.BotfrontTrackerStore
+    url: http://botfront:3000/graphql
+
+#============================================================================================================================
+policies:
+  - name: MemoizationPolicy
+  - name: AugmentedMemoizationPolicy
+  - name: RulePolicy
+  - name: UnexpecTEDIntentPolicy
+    max_history: 5
+    epochs: 100
+  - name: TEDPolicy
+    epochs: 50
+    max_history: 5
+    batch_size: [32, 64]
+    constrain_similarities: true
+
+#============================================================================================================================
+defaultDomain:
+  slots:
+    account_type: 
+      type: categorical
+      influence_conversation: true
+      values:
+        - savings
+        - checking
+        - credit
+      mappings: 
+      - type: from_entity
+        entity: account_type
+        conditions:
+          - active_loop: null
+
+      disambiguation_message:
+        mappings:
+          - type: custom
+        type: any
+
+    actions:
+      - action_botfront_disambiguation
+      - action_botfront_disambiguation_followup
+      - action_botfront_fallback
+      - action_botfront_mapping
+
+#============================================================================================================================
+webhooks:
+  restartRasaWebhook:
+    name: RestartRasa
+    url: ''
+    method: POST
+  uploadImageWebhook:
+    name: UploadImage
+    url: ''
+    method: POST
+  deleteImageWebhook:
+    name: DeleteImage
+    url: ''
+    method: DELETE
+  deploymentWebhook:
+    name: DeployProject
+    url: ''
+    method: POST
+  reportCrashWebhook:
+    name: ReportCrash
+    url: ''
+    method: POST
+  postTraining:
+    name: PostTraining
+    url: ''
+    method: POST
+
+#============================================================================================================================
