@@ -65,6 +65,7 @@ RUN chgrp -R 0 /app && chmod -R g=u /app && chmod o+wr /app
 VOLUME /tmp
 VOLUME /app/models
 VOLUME /app/config
+VOLUME /app/.config
 
 # change shell
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
