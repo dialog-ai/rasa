@@ -1,0 +1,77 @@
+services:
+  botfront:
+    image: '${IMAGES_CURRENT_BOTFRONT}'
+    container_name: botfront-app
+    restart: always
+    networks:
+      - botfront-network
+    # volumes:
+    #     #- './.models/:/app/models'
+    #     #- './admin/:/opt/bundle/bundle/programs/server/assets/app'
+    ports:
+      - '8888:3000'
+    depends_on:
+      - mongo
+    env_file:
+      - .env
+    environment:
+      PORT: 3000
+
+  rasa:
+    image: '${IMAGES_CURRENT_RASA}'
+    container_name: botfront-rasa
+    networks:
+      - botfront-network
+    restart: always
+    ports:
+      - '5005:5005'
+    volumes:
+      - './rasa/models/:/app/models'
+      - './rasa/config/:/app/config'
+      - './tmp/:/tmp'
+    env_file:
+      - .env
+  actions:
+    build:
+      context: ./actions
+      args:
+        RASA_SDK_IMAGE: '${IMAGES_CURRENT_ACTIONS}'
+    container_name: botfront-actions
+    networks:
+      - botfront-network
+    restart: always
+    ports:
+      - '5055:5055'
+    volumes:
+      - './actions:/app/actions'
+    command:
+      - start
+      - '--debug'
+      - '--actions'
+      - actions
+    env_file:
+      - .env
+  duckling:
+    image: '${IMAGES_CURRENT_DUCKLING}'
+    container_name: botfront-duckling
+    networks:
+      - botfront-network
+    restart: always
+    ports:
+      - '8000:8000'
+  mongo:
+    image: '${IMAGES_CURRENT_MONGO}'
+    container_name: botfront-mongo
+    restart: always
+    networks:
+      - botfront-network
+    volumes:
+      - botfront-db:/data/db
+    ports:
+      - '27017:27017'
+    env_file:
+      - .env
+networks:
+  botfront-network: {}
+volumes:
+  botfront-db: null

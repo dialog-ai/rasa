@@ -1,0 +1,45 @@
+actions:
+  - action_botfront_disambiguation
+  - action_botfront_disambiguation_followup
+  - action_botfront_fallback
+  - action_botfront_mapping
+  - utter_bye
+  - utter_get_started
+  - utter_hi
+entities: []
+forms: {}
+intents:
+  - chitchat.bye
+  - chitchat.greet
+  - get_started
+responses:
+  utter_get_started:
+    - metadata: null
+      text: How can i help you?
+  utter_hi:
+    - metadata: null
+      text: 'Hi, nice to meet you.'
+session_config: {}
+slots:
+  account_type:
+    influence_conversation: true
+    mappings:
+      - conditions:
+          - active_loop: null
+        entity: account_type
+        type: from_entity
+    type: categorical
+    values:
+      - savings
+      - checking
+      - credit
+  disambiguation_message:
+    mappings:
+      - type: custom
+    type: any
+  fallback_language:
+    initial_value: en
+    mappings:
+      - type: custom
+    type: any
+version: '3.1'

@@ -1,0 +1,17 @@
+[
+	{
+		"text": "tell me a joke",
+		"intent": "chitchat.tell_me_a_joke",
+		"entities": []
+	},
+	{
+		"text": "I wanna hear a good one",
+		"intent": "chitchat.tell_me_a_joke",
+		"entities": []
+	},
+	{
+		"text": "you are amazing",
+		"intent": "chitchat.you_are_good",
+		"entities": []
+	}
+]
