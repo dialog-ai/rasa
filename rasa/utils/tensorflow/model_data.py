@@ -32,6 +32,7 @@ def ragged_array_to_ndarray(ragged_array: Iterable[np.ndarray]) -> np.ndarray:
     the same shape, then creates numpy array of objects.
     """
     try:
+        #FIXME: lonycell - deprecation warning
         return np.array(ragged_array)
     except ValueError:
         return np.array(ragged_array, dtype=object)

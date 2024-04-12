@@ -62,11 +62,10 @@ RUN chgrp -R 0 /app && chmod -R g=u /app && chmod o+wr /app
 #USER root
 
 # Create a volume for temporary data
-VOLUME /app
-VOLUME /app/models
-VOLUME /app/data
-VOLUME /app/.config
 VOLUME /tmp
+VOLUME /app/models
+VOLUME /app/config
+VOLUME /app/.config
 
 # change shell
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
@@ -77,6 +76,4 @@ EXPOSE 5005
 CMD rasa run \
   $([ -n "$MODEL_PATH" ] && echo "-m $MODEL_PATH") \
   $([ -n "$AUTH_TOKEN" ] && echo "--auth-token $AUTH_TOKEN" ) \
-  $([ -n "$CORS_ENABLE" ] && echo "$CORS_ENABLE" ) \
-  $([ -n "$DEBUG_ENABLE" ] && echo "$DEBUG_ENABLE" ) \
-  --enable-api
+  --enable-api --cors "*" --debug

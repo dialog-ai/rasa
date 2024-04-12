@@ -702,10 +702,15 @@ def create_app(
         )
 
     @app.get("/status")
-    @requires_auth(app, auth_token)
-    @ensure_loaded_agent(app)
+    # FIXME: lonycell begin >>> 2024-04-11
+    # @requires_auth(app, auth_token)
+    # @ensure_loaded_agent(app)
+    # FIXME: lonycell end <<< 2024-04-11
     async def status(request: Request) -> HTTPResponse:
         """Respond with the model name and the fingerprint of that model."""
+
+        logger.debug(f'api called: /status')
+
         return response.json(
             {
                 "model_file": app.ctx.agent.processor.model_filename,
