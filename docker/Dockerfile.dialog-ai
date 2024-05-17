@@ -28,7 +28,12 @@ RUN . /opt/venv/bin/activate && make install-mitie && \
   pip install --no-deps dist/*.whl && \
   rm -rf dist *.egg-info
 
-  RUN . /opt/venv/bin/activate && \
+RUN . /opt/venv/bin/activate && make install-spacy-ko && \
+  poetry build -f wheel -n && \
+  pip install --no-deps dist/*.whl && \
+  rm -rf dist *.egg-info
+
+RUN . /opt/venv/bin/activate && \
   cd rasa_addons && \
   mkdir rasa_addons && \
   mv `\ls -1 . | grep -v -e setup.py -e rasa_addons` ./rasa_addons/ && \
@@ -40,8 +45,8 @@ RUN . /opt/venv/bin/activate && make install-mitie && \
 ENV PATH="/opt/venv/bin:$PATH"
 
 # spacy link
-RUN python -m spacy download en_core_web_md && \
-    python -m spacy link en_core_web_md en
+# RUN python -m spacy download en_core_web_md && \
+#     python -m spacy link en_core_web_md en
 
 # start a new build stage
 FROM ${IMAGE_BASE_NAME}:base-${BASE_IMAGE_HASH} as runner

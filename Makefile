@@ -82,7 +82,7 @@ formatter:
 format: formatter
 
 lint:
-     # Ignore docstring errors when running on the entire project
+	# Ignore docstring errors when running on the entire project
 	poetry run ruff check rasa tests --ignore D
 	poetry run black --check rasa tests
 	make lint-docstrings
@@ -105,7 +105,6 @@ static-checks: lint lint-security types
 
 prepare-spacy:
 	poetry run python -m spacy download en_core_web_md
-	poetry run python -m spacy download de_core_news_sm
 
 prepare-mitie:
 	wget --progress=dot:giga -N -P data/ https://github.com/mit-nlp/MITIE/releases/download/v0.4/MITIE-models-v0.2.tar.bz2
@@ -123,6 +122,7 @@ endif
 prepare-transformers:
 	while read -r MODEL; do poetry run python scripts/download_transformer_model.py $$MODEL ; done < data/test/hf_transformers_models.txt
 	if ! [ $(CI) ]; then poetry run python scripts/download_transformer_model.py rasa/LaBSE; fi
+
 prepare-tests-macos:
 	brew install wget graphviz || true
 
@@ -281,29 +281,6 @@ build-docker-spacy-it:
 	docker buildx bake --set default.platform=${PLATFORM} -f docker/docker-bake.hcl base-builder && \
 	docker buildx bake --set default.platform=${PLATFORM} -f docker/docker-bake.hcl spacy-it
 
-# FIXME: lonycell begin >>> 2024-04-08
-ai:
-	export IMAGE_NAME=hmaas/rasa-core && \
-	export IMAGE_VERSION=v3.7.0-dev && \
-	docker buildx use default && \
-	docker buildx bake --set default.platform=${PLATFORM} -f docker/docker-bake.hcl base && \
-	docker buildx bake --set default.platform=${PLATFORM} -f docker/docker-bake.hcl base-poetry && \
-	docker buildx bake --set default.platform=${PLATFORM} -f docker/docker-bake.hcl base-builder && \
-	docker buildx bake --set default.platform=${PLATFORM} -f docker/docker-bake.hcl dialog-ai
-
-##docker buildx bake --set default.platform=${PLATFORM} -f docker/docker-bake.hcl rasa-core
-##docker buildx bake --set default.platform=${PLATFORM} -f docker/docker-bake.hcl rasa-addons
-	
-
-build-docker-botfront:
-	export IMAGE_NAME=hmaas/rasa-core && \
-	docker buildx use default && \
-	docker buildx bake --set default.platform=${PLATFORM} -f docker/docker-bake.hcl base && \
-	docker buildx bake --set default.platform=${PLATFORM} -f docker/docker-bake.hcl base-images && \
-	docker buildx bake --set default.platform=${PLATFORM} -f docker/docker-bake.hcl base-builder && \
-	docker buildx bake --set default.platform=${PLATFORM} -f docker/docker-bake.hcl dialog-ai
-# FIXME: lonycell end <<< 2024-04-08
-
 build-tests-deployment-env: ## Create environment files (.env) for docker-compose.
 	cd tests_deployment && \
 	test -f .env || cat .env.example >> .env
@@ -315,3 +292,67 @@ run-integration-containers: build-tests-deployment-env ## Run the integration te
 stop-integration-containers: ## Stop the integration test containers.
 	cd tests_deployment && \
 	docker-compose -f docker-compose.integration.yml down
+
+
+# FIXME: lonycell begin >>> 2024-04-08
+ai:
+	export IMAGE_NAME=hmaas/rasa-core && \
+	export IMAGE_VERSION=v3.7.0-dev && \
+	docker buildx use default && \
+	docker buildx bake --set default.platform=${PLATFORM} -f docker/docker-bake.hcl base && \
+	docker buildx bake --set default.platform=${PLATFORM} -f docker/docker-bake.hcl base-poetry && \
+	docker buildx bake --set default.platform=${PLATFORM} -f docker/docker-bake.hcl base-builder && \
+	docker buildx bake --set default.platform=${PLATFORM} -f docker/docker-bake.hcl spacy-ko && \
+	docker buildx bake --set default.platform=${PLATFORM} -f docker/docker-bake.hcl dialog-ai
+
+##docker buildx bake --set default.platform=${PLATFORM} -f docker/docker-bake.hcl rasa-core
+##docker buildx bake --set default.platform=${PLATFORM} -f docker/docker-bake.hcl rasa-addons
+
+build-docker-botfront:
+	export IMAGE_NAME=hmaas/rasa-core && \
+	docker buildx use default && \
+	docker buildx bake --set default.platform=${PLATFORM} -f docker/docker-bake.hcl base && \
+	docker buildx bake --set default.platform=${PLATFORM} -f docker/docker-bake.hcl base-images && \
+	docker buildx bake --set default.platform=${PLATFORM} -f docker/docker-bake.hcl base-builder && \
+	docker buildx bake --set default.platform=${PLATFORM} -f docker/docker-bake.hcl dialog-ai
+
+install-spacy-ko:
+	poetry run python -m pip install -U spacy
+	poetry run python -m pip install -U konlpy
+	poetry run python -m pip install -U mecab-python3
+	python -m spacy download en
+
+	wget --no-verbose https://bitbucket.org/eunjeon/mecab-ko/downloads/mecab-0.996-ko-0.9.2.tar.gz
+	tar -zxvf mecab-0.996-ko-0.9.2.tar.gz
+	cd mecab-0.996-ko-0.9.2/ &&\
+	./configure &&\
+	make &&\
+	make check &&\
+	make install &&\
+	cd ..
+	
+	echo '/usr/local/lib' >> /etc/ld.so.conf
+	ldconfig
+
+	wget --no-verbose https://bitbucket.org/eunjeon/mecab-ko-dic/downloads/mecab-ko-dic-2.1.1-20180720.tar.gz
+	tar -zxvf mecab-ko-dic-2.1.1-20180720.tar.gz
+	cd mecab-ko-dic-2.1.1-20180720/ &&\
+	./autogen.sh &&\
+	./configure &&\
+	make install &&\
+	cd ..
+
+	echo '/usr/local/lib/mecab/dic/mecab-ko-dic' >> /etc/ld.so.conf
+	ldconfig
+
+	python -m spacy init vectors ko ko.vec.gz ./spacy.ko
+
+build-docker-spacy-ko:
+	export IMAGE_NAME=hmaas/rasa-core && \
+	docker buildx use default && \
+	docker buildx bake --set default.platform=${PLATFORM} -f docker/docker-bake.hcl base && \
+	docker buildx bake --set default.platform=${PLATFORM} -f docker/docker-bake.hcl base-poetry && \
+	docker buildx bake --set default.platform=${PLATFORM} -f docker/docker-bake.hcl base-builder && \
+	docker buildx bake --set default.platform=${PLATFORM} -f docker/docker-bake.hcl spacy-ko
+# FIXME: lonycell end <<< 2024-04-08
+

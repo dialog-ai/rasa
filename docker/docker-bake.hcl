@@ -112,48 +112,6 @@ target "full" {
   ]
 }
 
-# FIXME: lonycell begin >>> 2024-04-08
-target "dialog-ai" {
-  dockerfile = "docker/Dockerfile.dialog-ai"
-  tags       = ["${IMAGE_NAME}:${IMAGE_VERSION}"]
-
-  args = {
-    IMAGE_BASE_NAME         = "${IMAGE_NAME}"
-    IMAGE_VERSION           = "${IMAGE_VERSION}"
-    BASE_IMAGE_HASH         = "${BASE_IMAGE_HASH}"
-    BASE_MITIE_IMAGE_HASH   = "${BASE_MITIE_IMAGE_HASH}"
-    BASE_BUILDER_IMAGE_HASH = "${BASE_BUILDER_IMAGE_HASH}"
-  }
-
-  cache-to = ["type=inline"]
-
-  cache-from = [
-    "type=registry,ref=${IMAGE_NAME}:base-${BASE_IMAGE_HASH}",
-    "type=registry,ref=${IMAGE_NAME}:base-builder-${BASE_BUILDER_IMAGE_HASH}",
-  ]
-}
-
-target "rasa-addons" {
-  dockerfile = "docker/Dockerfile.rasa-addons"
-  tags       = ["${IMAGE_NAME}:${IMAGE_TAG}-rasa-addons"]
-
-  args = {
-    IMAGE_BASE_NAME         = "${IMAGE_NAME}"
-    BASE_IMAGE_HASH         = "${BASE_IMAGE_HASH}"
-    BASE_MITIE_IMAGE_HASH   = "${BASE_MITIE_IMAGE_HASH}"
-    BASE_BUILDER_IMAGE_HASH = "${BASE_BUILDER_IMAGE_HASH}"
-  }
-
-  cache-to = ["type=inline"]
-
-  cache-from = [
-    "type=registry,ref=${IMAGE_NAME}:base-${BASE_IMAGE_HASH}",
-    "type=registry,ref=${IMAGE_NAME}:base-builder-${BASE_BUILDER_IMAGE_HASH}",
-    "type=registry,ref=${IMAGE_NAME}:latest-rasa-addons",
-  ]
-}
-# FIXME: lonycell end <<< 2024-04-08
-
 target "mitie-en" {
   dockerfile = "docker/Dockerfile.pretrained_embeddings_mitie_en"
   tags       = ["${IMAGE_NAME}:${IMAGE_TAG}-mitie-en"]
@@ -213,9 +171,52 @@ target "spacy-it" {
   ]
 }
 
-target "spacy-en" {
-  dockerfile = "docker/Dockerfile.pretrained_embeddings_spacy_en"
-  tags       = ["${IMAGE_NAME}:${IMAGE_TAG}-spacy-en"]
+##=========================================================================================
+##FIXME: lonycell
+
+target "dialog-ai" {
+  dockerfile = "docker/Dockerfile.dialog-ai"
+  tags       = ["${IMAGE_NAME}:${IMAGE_VERSION}"]
+
+  args = {
+    IMAGE_BASE_NAME         = "${IMAGE_NAME}"
+    IMAGE_VERSION           = "${IMAGE_VERSION}"
+    BASE_IMAGE_HASH         = "${BASE_IMAGE_HASH}"
+    BASE_MITIE_IMAGE_HASH   = "${BASE_MITIE_IMAGE_HASH}"
+    BASE_BUILDER_IMAGE_HASH = "${BASE_BUILDER_IMAGE_HASH}"
+  }
+
+  cache-to = ["type=inline"]
+
+  cache-from = [
+    "type=registry,ref=${IMAGE_NAME}:base-${BASE_IMAGE_HASH}",
+    "type=registry,ref=${IMAGE_NAME}:base-builder-${BASE_BUILDER_IMAGE_HASH}",
+  ]
+}
+
+target "rasa-addons" {
+  dockerfile = "docker/Dockerfile.rasa-addons"
+  tags       = ["${IMAGE_NAME}:${IMAGE_TAG}-rasa-addons"]
+
+  args = {
+    IMAGE_BASE_NAME         = "${IMAGE_NAME}"
+    BASE_IMAGE_HASH         = "${BASE_IMAGE_HASH}"
+    BASE_MITIE_IMAGE_HASH   = "${BASE_MITIE_IMAGE_HASH}"
+    BASE_BUILDER_IMAGE_HASH = "${BASE_BUILDER_IMAGE_HASH}"
+  }
+
+  cache-to = ["type=inline"]
+
+  cache-from = [
+    "type=registry,ref=${IMAGE_NAME}:base-${BASE_IMAGE_HASH}",
+    "type=registry,ref=${IMAGE_NAME}:base-builder-${BASE_BUILDER_IMAGE_HASH}",
+    "type=registry,ref=${IMAGE_NAME}:latest-rasa-addons",
+  ]
+}
+
+target "spacy-ko" {
+  dockerfile = "docker/Dockerfile.pretrained_embeddings_spacy_ko"
+  tags       = ["${IMAGE_NAME}:${IMAGE_TAG}-spacy-ko"]
 
   args = {
     IMAGE_BASE_NAME         = "${IMAGE_NAME}"
@@ -228,6 +229,7 @@ target "spacy-en" {
   cache-from = [
     "type=registry,ref=${IMAGE_NAME}:base-${BASE_IMAGE_HASH}",
     "type=registry,ref=${IMAGE_NAME}:base-builder-${BASE_BUILDER_IMAGE_HASH}",
-    "type=registry,ref=${IMAGE_NAME}:latest-spacy-en",
+    "type=registry,ref=${IMAGE_NAME}:latest-spacy-ko",
   ]
 }
+##=========================================================================================

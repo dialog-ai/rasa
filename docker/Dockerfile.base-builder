@@ -9,6 +9,11 @@ ARG BUILDPLATFORM
 RUN apt-get update -qq && \
   apt-get install -y --no-install-recommends \
   build-essential \
+  gcc \
+  g++ \
+  make \
+  automake \
+  libtool \
   wget \
   openssh-client \
   graphviz-dev \
